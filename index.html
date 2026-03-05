@@ -1838,8 +1838,18 @@
     });
 
     // Create or get chart instance (DEFENSIVE: check echarts available)
-    if (!window.weeklyPatternChart){
+    // Check if we need to (re)initialize the chart
+    const needsInit = !window.weeklyPatternChart ||
+                      typeof window.weeklyPatternChart.setOption !== 'function';
+
+    if (needsInit){
       try {
+        // Clean up any invalid instance first
+        if (window.weeklyPatternChart){
+          try { window.weeklyPatternChart.dispose(); } catch(e){}
+          window.weeklyPatternChart = null;
+        }
+
         if (typeof echarts === 'undefined'){
           console.error('ECharts library not loaded');
           container.innerHTML = '<div class="notice">Chart library not available</div>';
@@ -1848,32 +1858,34 @@
 
         // Check if container has dimensions (might be hidden)
         const rect = container.getBoundingClientRect();
+        console.log('Weekly pattern chart container dimensions:', rect.width, 'x', rect.height);
+
         if (rect.width === 0 || rect.height === 0){
-          console.warn('Container has no dimensions - might be hidden. Width:', rect.width, 'Height:', rect.height);
-          // Still try to initialize, but this might fail
+          console.error('Container has zero dimensions - cannot initialize chart. Is it visible?');
+          container.innerHTML = '<div class="notice">Cannot initialize chart - container is hidden or has no size. Please ensure the Sleep tab is visible.</div>';
+          return;
         }
 
         window.weeklyPatternChart = echarts.init(container, null, { renderer: "canvas" });
+
         if (!window.weeklyPatternChart || typeof window.weeklyPatternChart.setOption !== 'function'){
-          console.error('Failed to initialize weekly pattern chart. Container dimensions:', rect.width, 'x', rect.height);
-          container.innerHTML = '<div class="notice">Failed to initialize chart (container might be hidden)</div>';
+          console.error('echarts.init returned invalid instance');
+          window.weeklyPatternChart = null; // Reset to allow retry
+          container.innerHTML = '<div class="notice">Failed to initialize chart - please try again</div>';
           return;
         }
+
         window.addEventListener("resize", () => {
           try { window.weeklyPatternChart?.resize(); } catch(e){}
         });
+
+        console.log('Weekly pattern chart initialized successfully');
       } catch (error) {
         console.error('Weekly pattern chart initialization error:', error);
+        window.weeklyPatternChart = null; // Reset to allow retry
         container.innerHTML = `<div class="notice">Chart initialization failed: ${error.message}</div>`;
         return;
       }
-    }
-
-    // Verify chart is valid before using
-    if (!window.weeklyPatternChart || typeof window.weeklyPatternChart.setOption !== 'function'){
-      console.error('Invalid chart instance');
-      container.innerHTML = '<div class="notice">Invalid chart instance</div>';
-      return;
     }
 
     window.weeklyPatternChart.setOption({
