@@ -988,6 +988,54 @@
   // ========================================
 
   /**
+   * Validates sleep data quality
+   * Returns { valid: boolean, issues: string[], validRecords: array }
+   *
+   * DEFENSIVE CODING: Validates data before analysis
+   */
+  function validateSleepData(sleepData) {
+    const issues = [];
+
+    // Check basic structure
+    if (!Array.isArray(sleepData)) {
+      issues.push('Sleep data is not an array');
+      return { valid: false, issues, validRecords: [] };
+    }
+
+    if (sleepData.length === 0) {
+      issues.push('No sleep records found');
+      return { valid: false, issues, validRecords: [] };
+    }
+
+    // Filter valid records
+    const validRecords = sleepData.filter(d =>
+      d &&
+      d.date &&
+      typeof d.durationMinutes === 'number' &&
+      d.durationMinutes > 0 &&
+      d.durationMinutes < (24 * 60) // less than 24 hours
+    );
+
+    // Check data quality
+    const validRatio = validRecords.length / sleepData.length;
+    if (validRatio < 0.5) {
+      issues.push(`Only ${validRecords.length}/${sleepData.length} records have valid data`);
+    }
+
+    // Check minimum data threshold
+    if (validRecords.length < 7) {
+      issues.push('Need at least 7 nights of data for meaningful analysis');
+      return { valid: false, issues, validRecords };
+    }
+
+    return {
+      valid: true,
+      issues, // May contain warnings even if valid
+      validRecords
+    };
+  }
+
+  /**
    * Fetch sleep records from the database
    * Returns array matching SLEEP DATA MODEL CONTRACT
    */
@@ -1889,10 +1937,31 @@
     setProgress(70, "Loading sleep data for Deep Dive analysis…");
     const sleepRecordsData = await fetchSleepRecords();
 
+    // Validate sleep data quality (DEFENSIVE CODING)
+    const validation = validateSleepData(sleepRecordsData);
+    if (!validation.valid) {
+      console.warn('Sleep data validation failed:', validation.issues);
+      const errorMsg = validation.issues.join('. ');
+      const els = ["sleepDeepDiveDuration", "sleepDeepDiveTiming"];
+      els.forEach(id => {
+        const el = $(id);
+        if (el) el.innerHTML = `<div class="notice">${errorMsg}</div>`;
+      });
+      return; // Stop processing if data invalid
+    }
+
+    // Log warnings if any (but continue processing)
+    if (validation.issues.length > 0) {
+      console.warn('Sleep data quality warnings:', validation.issues);
+    }
+
+    // Use validated records for analysis
+    const validSleepRecords = validation.validRecords;
+
     // Agent 1: Duration Analysis
     setProgress(75, "Analyzing sleep duration patterns…");
     try {
-      await renderSleepDuration(sleepRecordsData, "sleepDeepDiveDuration");
+      await renderSleepDuration(validSleepRecords, "sleepDeepDiveDuration");
     } catch (error) {
       console.error("Duration Analysis error:", error);
       const el = $("sleepDeepDiveDuration");
@@ -1902,7 +1971,7 @@
     // Agent 2: Timing Patterns
     setProgress(80, "Analyzing sleep timing patterns…");
     try {
-      await renderSleepTiming(sleepRecordsData, "sleepDeepDiveTiming");
+      await renderSleepTiming(validSleepRecords, "sleepDeepDiveTiming");
     } catch (error) {
       console.error("Timing Patterns error:", error);
       const el = $("sleepDeepDiveTiming");
