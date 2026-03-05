@@ -1845,10 +1845,18 @@
           container.innerHTML = '<div class="notice">Chart library not available</div>';
           return;
         }
+
+        // Check if container has dimensions (might be hidden)
+        const rect = container.getBoundingClientRect();
+        if (rect.width === 0 || rect.height === 0){
+          console.warn('Container has no dimensions - might be hidden. Width:', rect.width, 'Height:', rect.height);
+          // Still try to initialize, but this might fail
+        }
+
         window.weeklyPatternChart = echarts.init(container, null, { renderer: "canvas" });
         if (!window.weeklyPatternChart || typeof window.weeklyPatternChart.setOption !== 'function'){
-          console.error('Failed to initialize weekly pattern chart');
-          container.innerHTML = '<div class="notice">Failed to initialize chart</div>';
+          console.error('Failed to initialize weekly pattern chart. Container dimensions:', rect.width, 'x', rect.height);
+          container.innerHTML = '<div class="notice">Failed to initialize chart (container might be hidden)</div>';
           return;
         }
         window.addEventListener("resize", () => {
@@ -2041,6 +2049,9 @@
     // Agent 3: Weekly Pattern Detection
     setProgress(85, "Analyzing weekly patterns…");
     const sleepData = await fetchSleepData();
+
+    // Delay chart initialization to ensure container is visible and measured
+    await new Promise(resolve => setTimeout(resolve, 100));
     await renderWeeklyPatterns(sleepData, "weeklyPatternChart");
 
     // Render pattern insights
