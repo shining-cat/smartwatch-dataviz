@@ -1,0 +1,90 @@
+SLEEP DURATION ANALYSIS COMPONENT - Agent 1
+===========================================
+Status: COMPLETED
+Commit: e98886c
+
+IMPLEMENTATION SUMMARY
+----------------------
+
+Added Sleep Duration Analysis component to index.html with:
+
+1. DATABASE SCHEMA (v3)
+   - Added sleepRecords table to store full sleep records
+   - Indexes: date (primary), from, to
+   - Wipe storage updated to clear sleepRecords
+
+2. DATA PARSING
+   - Modified parseAndStoreDailyCSV() to store full sleep records
+   - Creates sleepRecordsBuffer alongside rowsBuffer
+   - Stores: date, from, to, durationMinutes, durationHours, dayOfWeek, weekdayName
+   - Batch processing for performance (2000 records)
+
+3. ANALYSIS FUNCTIONS
+
+   fetchSleepRecords()
+   - Returns: Array of sleep records matching SLEEP DATA MODEL CONTRACT
+   - Defensive: handles missing table, returns [] on error
+
+   calculateSleepStats(sleepData)
+   - Returns: { avg, median, stdDev, min, max, percentiles: {p25, p50, p75}, consistencyScore, totalNights }
+   - Filters invalid data (duration <= 0, > 24h, NaN)
+   - Consistency score: 0-100 based on coefficient of variation
+   - Console logs summary for debugging
+
+   generateDurationHistogram(sleepData)
+   - Returns: { bins: [], counts: [], total }
+   - Bins: <5h, 5-6h, 6-7h, 7-8h, 8-9h, >9h
+   - Filters invalid data
+
+   renderSleepDuration(sleepData, containerId)
+   - Main rendering function
+   - Creates card with stats grid + ECharts histogram
+   - Highlights healthy range (7-9h) in green, 6-7h in blue
+   - Defensive error handling with helpful messages
+   - No data: shows "Upload your health export" message
+   - Corrupted data: shows warning message
+
+4. INTEGRATION POINT
+
+   To use in main orchestrator:
+
+   ```javascript
+   // Fetch sleep records
+   const sleepData = await fetchSleepRecords();
+
+   // Render component
+   await renderSleepDuration(sleepData, 'containerId');
+   ```
+
+   Container must exist in DOM. Component creates its own card styling.
+
+5. TESTING NOTES
+
+   - Requires health export ZIP with sleep.csv at:
+     /Users/shiva.bernhard@m10s.io/__DEV/PERSO/smartwatch-dataviz/data/raw/health-export.zip
+
+   - On first load after code change, users must re-upload ZIP to populate sleepRecords table
+
+   - Console will show:
+     - "Sleep Duration Stats:" with calculated values
+     - Any errors in data processing
+
+   - Visual validation:
+     - 7-9h bars should be green (#3dce79)
+     - 6-7h bar should be blue (#3aa0ff)
+     - Other bars should be muted gray (#9fb0c3)
+     - Stats cards show avg, median, consistency, range
+
+6. DEFENSIVE FEATURES
+
+   - Handles missing/undefined sleepRecords table
+   - Filters out invalid durations (NaN, <=0, >24h)
+   - Try-catch around all functions
+   - Graceful degradation with user-friendly messages
+   - Console logging for debugging
+
+NEXT STEPS
+----------
+- Agent 2: Sleep Timing Patterns Component
+- Agent 3: Weekly Pattern Detection Component
+- Integration: Main orchestrator to call all 3 components

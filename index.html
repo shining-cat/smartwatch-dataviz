@@ -189,6 +189,15 @@
           <h2 style="margin-bottom:6px">Sleep summary</h2>
           <div id="sleepInsightCards" style="display:flex; gap:8px; flex-wrap:wrap;"></div>
         </div>
+        <div class="card" style="margin-top:10px">
+          <h2 style="margin-bottom:6px">Weekly patterns</h2>
+          <div id="weeklyPatternChart" class="chart" style="height:320px"></div>
+          <div class="muted" style="margin-top:6px">Average sleep duration per weekday. Bars colored by deviation from weekly mean.</div>
+        </div>
+        <div class="card" style="margin-top:10px">
+          <h2 style="margin-bottom:6px">Pattern insights</h2>
+          <div id="weeklyPatternInsights" style="display:flex; gap:8px; flex-wrap:wrap; flex-direction:column;"></div>
+        </div>
       </div>
 
       </div>
@@ -1277,6 +1286,271 @@
     return { dur, bd, avg30, overallAvg, pctBelow6, bedtimeStd };
   }
 
+  // --------------------------
+  // Weekly Pattern Detection Component (Agent 3)
+  // --------------------------
+
+  /**
+   * Fetch full sleep data with day-of-week information
+   * Returns array conforming to SLEEP DATA MODEL CONTRACT
+   */
+  async function fetchSleepData(){
+    const durRows = await db.daily.where("metric").equals("sleep_duration_min").sortBy("date");
+    const bedRows = await db.daily.where("metric").equals("sleep_bedtime_min").sortBy("date");
+    const wakeRows = await db.daily.where("metric").equals("sleep_wake_min").sortBy("date");
+
+    // Build map by date
+    const durMap = new Map(durRows.map(r => [r.date, r.value]));
+    const bedMap = new Map(bedRows.map(r => [r.date, r.value]));
+    const wakeMap = new Map(wakeRows.map(r => [r.date, r.value]));
+
+    const weekdayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const sleepData = [];
+
+    for (const r of durRows){
+      const date = r.date;
+      const durationMinutes = r.value;
+
+      if (durationMinutes == null || !Number.isFinite(durationMinutes)) continue;
+
+      const dt = new Date(date + "T00:00:00");
+      const dayOfWeek = dt.getDay(); // 0=Sunday, 6=Saturday
+
+      sleepData.push({
+        date,
+        durationMinutes,
+        durationHours: durationMinutes / 60,
+        dayOfWeek,
+        weekdayName: weekdayNames[dayOfWeek],
+        bedtimeMin: bedMap.get(date),
+        wakeMin: wakeMap.get(date)
+      });
+    }
+
+    return sleepData;
+  }
+
+  /**
+   * Calculate average sleep duration per weekday
+   * @returns {Object} Map of dayOfWeek (0-6) to average duration in minutes
+   */
+  function calculateWeekdayAverages(sleepData){
+    const buckets = Array.from({length: 7}, () => ({sum: 0, count: 0}));
+
+    for (const entry of sleepData){
+      if (entry.durationMinutes != null && Number.isFinite(entry.durationMinutes)){
+        buckets[entry.dayOfWeek].sum += entry.durationMinutes;
+        buckets[entry.dayOfWeek].count += 1;
+      }
+    }
+
+    const averages = {};
+    for (let i = 0; i < 7; i++){
+      averages[i] = buckets[i].count > 0 ? buckets[i].sum / buckets[i].count : null;
+    }
+
+    return averages;
+  }
+
+  /**
+   * Detect weekend vs weekday sleep patterns
+   * @returns {Object} {weekdayAvg, weekendAvg, difference, percentDiff}
+   */
+  function detectWeekendEffect(sleepData){
+    const weekdayBucket = {sum: 0, count: 0}; // Mon-Fri (1-5)
+    const weekendBucket = {sum: 0, count: 0}; // Sat-Sun (0, 6)
+
+    for (const entry of sleepData){
+      if (entry.durationMinutes == null || !Number.isFinite(entry.durationMinutes)) continue;
+
+      if (entry.dayOfWeek >= 1 && entry.dayOfWeek <= 5){
+        // Weekday
+        weekdayBucket.sum += entry.durationMinutes;
+        weekdayBucket.count += 1;
+      } else {
+        // Weekend
+        weekendBucket.sum += entry.durationMinutes;
+        weekendBucket.count += 1;
+      }
+    }
+
+    const weekdayAvg = weekdayBucket.count > 0 ? weekdayBucket.sum / weekdayBucket.count : null;
+    const weekendAvg = weekendBucket.count > 0 ? weekendBucket.sum / weekendBucket.count : null;
+
+    let difference = null;
+    let percentDiff = null;
+
+    if (weekdayAvg != null && weekendAvg != null){
+      difference = weekendAvg - weekdayAvg;
+      percentDiff = (difference / weekdayAvg) * 100;
+    }
+
+    return { weekdayAvg, weekendAvg, difference, percentDiff };
+  }
+
+  /**
+   * Detect recurring weekly patterns and generate insights
+   * @returns {Array<string>} Array of human-readable insight strings
+   */
+  function detectRecurringPatterns(sleepData){
+    if (sleepData.length < 28) return ["Need at least 4 weeks of data"];
+
+    const weekdayAvgs = calculateWeekdayAverages(sleepData);
+    const insights = [];
+
+    // Calculate overall weekly mean
+    const validAvgs = Object.values(weekdayAvgs).filter(v => v != null);
+    if (validAvgs.length === 0) return ["Insufficient data for pattern detection"];
+
+    const weeklyMean = validAvgs.reduce((a, b) => a + b, 0) / validAvgs.length;
+
+    const weekdayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const deviations = [];
+
+    // Calculate deviations for each day
+    for (let day = 0; day < 7; day++){
+      const avg = weekdayAvgs[day];
+      if (avg == null) continue;
+
+      const deviation = avg - weeklyMean;
+      const percentDev = (deviation / weeklyMean) * 100;
+
+      // Flag significant deviations (>30 min OR >10%)
+      if (Math.abs(deviation) > 30 || Math.abs(percentDev) > 10){
+        deviations.push({
+          day,
+          name: weekdayNames[day],
+          deviation,
+          percentDev,
+          avg
+        });
+      }
+    }
+
+    // Sort by absolute deviation (strongest patterns first)
+    deviations.sort((a, b) => Math.abs(b.deviation) - Math.abs(a.deviation));
+
+    // Generate insights for top patterns
+    for (const d of deviations.slice(0, 3)){
+      const sign = d.deviation > 0 ? "+" : "";
+      const minStr = Math.abs(Math.round(d.deviation));
+      const dir = d.deviation > 0 ? "above" : "below";
+      insights.push(`${d.name}s: ${sign}${minStr} min ${dir} weekly avg`);
+    }
+
+    // Add weekend effect if significant
+    const weekendEffect = detectWeekendEffect(sleepData);
+    if (weekendEffect.difference != null && Math.abs(weekendEffect.difference) > 30){
+      const sign = weekendEffect.difference > 0 ? "+" : "";
+      const hours = (Math.abs(weekendEffect.difference) / 60).toFixed(1);
+      insights.push(`Weekend: ${sign}${hours}h vs weekdays`);
+    }
+
+    return insights.length > 0 ? insights : ["No significant weekly patterns detected"];
+  }
+
+  /**
+   * Render weekly pattern visualization and insights
+   */
+  async function renderWeeklyPatterns(sleepData, containerId){
+    const container = $(containerId);
+    if (!container) return;
+
+    // Defensive: check minimum data threshold
+    if (sleepData.length < 28){
+      container.innerHTML = '<div class="notice">Need at least 4 weeks of data for weekly pattern analysis</div>';
+      return;
+    }
+
+    const weekdayAvgs = calculateWeekdayAverages(sleepData);
+    const weekendEffect = detectWeekendEffect(sleepData);
+    const patterns = detectRecurringPatterns(sleepData);
+
+    console.log("Weekly Pattern Detection Results:", {
+      weekdayAvgs,
+      weekendEffect,
+      patterns,
+      totalNights: sleepData.length
+    });
+
+    // Prepare data for bar chart (Sun-Sat)
+    const weekdayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const chartData = [];
+    const categories = [];
+
+    for (let day = 0; day < 7; day++){
+      categories.push(weekdayNames[day].slice(0, 3)); // Abbreviated names
+      chartData.push(weekdayAvgs[day] != null ? weekdayAvgs[day] : 0);
+    }
+
+    // Calculate mean for highlighting deviations
+    const validValues = chartData.filter(v => v > 0);
+    const mean = validValues.length > 0 ? validValues.reduce((a, b) => a + b, 0) / validValues.length : 0;
+
+    // Color bars based on deviation from mean
+    const itemStyles = chartData.map(v => {
+      if (v === 0) return { color: '#223046' }; // No data
+      const deviation = v - mean;
+      if (Math.abs(deviation) > 30){
+        return { color: deviation > 0 ? '#3dce79' : '#ff5a6b' }; // Above/below mean
+      }
+      return { color: '#3aa0ff' }; // Normal
+    });
+
+    // Create or get chart instance
+    if (!window.weeklyPatternChart){
+      window.weeklyPatternChart = echarts.init(container, null, { renderer: "canvas" });
+      window.addEventListener("resize", () => {
+        try { window.weeklyPatternChart.resize(); } catch(e){}
+      });
+    }
+
+    window.weeklyPatternChart.setOption({
+      backgroundColor: "transparent",
+      title: {
+        text: "Weekly Sleep Patterns",
+        left: "center",
+        top: 8,
+        textStyle: { color: "#e7eef7", fontSize: 14 }
+      },
+      tooltip: {
+        trigger: "axis",
+        formatter: (params) => {
+          const p = params[0];
+          if (!p || p.value === 0) return `${p.name}<br/>No data`;
+          return `${p.name}<br/>${fmtHoursMins(p.value)}`;
+        }
+      },
+      grid: { left: 55, right: 20, top: 45, bottom: 45 },
+      xAxis: {
+        type: "category",
+        data: categories,
+        axisLabel: { color: "#9fb0c3" },
+        axisLine: { lineStyle: { color: "#223046" } }
+      },
+      yAxis: {
+        type: "value",
+        axisLabel: {
+          color: "#9fb0c3",
+          formatter: (v) => `${Math.round(v / 60)}h`
+        },
+        splitLine: { lineStyle: { color: "#1f2a3a" } }
+      },
+      series: [{
+        type: "bar",
+        data: chartData.map((v, i) => ({
+          value: v,
+          itemStyle: itemStyles[i]
+        })),
+        barMaxWidth: 50
+      }]
+    }, true);
+
+    setTimeout(() => {
+      try { window.weeklyPatternChart.resize(); } catch(e){}
+    }, 0);
+  }
+
   async function renderSleepDashboard(){
     setProgress(20, "Rendering sleep dashboard…");
     const ins = await computeSleepInsights();
@@ -1351,8 +1625,60 @@
       }, true);
     }
 
+    // Weekly pattern analysis and rendering
+    setProgress(80, "Analyzing weekly patterns…");
+    const sleepData = await fetchSleepData();
+    await renderWeeklyPatterns(sleepData, "weeklyPatternChart");
+
+    // Render pattern insights
+    const insightsEl = $("weeklyPatternInsights");
+    if (insightsEl && sleepData.length >= 28){
+      const weekendEffect = detectWeekendEffect(sleepData);
+      const patterns = detectRecurringPatterns(sleepData);
+
+      insightsEl.innerHTML = "";
+
+      // Weekend vs weekday card
+      if (weekendEffect.weekdayAvg != null && weekendEffect.weekendAvg != null){
+        const d = document.createElement("div");
+        d.className = "insight-card";
+        const diffColor = weekendEffect.difference > 0 ? "#3dce79" : (weekendEffect.difference < 0 ? "#ff5a6b" : "#9fb0c3");
+        const sign = weekendEffect.difference > 0 ? "+" : "";
+        d.innerHTML = `<div style="font-size:12px;color:#9fb0c3;">Weekend vs Weekday</div>
+                       <div style="font-size:18px;font-weight:700;margin-top:6px">
+                         <span style="color:${diffColor}">${sign}${fmtHoursMins(Math.abs(weekendEffect.difference))}</span>
+                       </div>
+                       <div class="muted" style="margin-top:6px">
+                         Weekday: ${fmtHoursMins(weekendEffect.weekdayAvg)}<br/>
+                         Weekend: ${fmtHoursMins(weekendEffect.weekendAvg)}
+                       </div>`;
+        insightsEl.appendChild(d);
+      }
+
+      // Pattern insights as bullets
+      if (patterns.length > 0 && patterns[0] !== "Need at least 4 weeks of data"){
+        const d = document.createElement("div");
+        d.style.fontSize = "13px";
+        d.style.color = "#e7eef7";
+        d.style.padding = "8px 0";
+        const ul = document.createElement("ul");
+        ul.style.margin = "0";
+        ul.style.paddingLeft = "20px";
+        for (const p of patterns){
+          const li = document.createElement("li");
+          li.textContent = p;
+          li.style.marginBottom = "4px";
+          ul.appendChild(li);
+        }
+        d.appendChild(ul);
+        insightsEl.appendChild(d);
+      }
+    } else if (insightsEl){
+      insightsEl.innerHTML = '<div class="notice">Need at least 4 weeks of data for pattern insights</div>';
+    }
+
     // ensure charts sized
-    setTimeout(()=>{ try{ window.sleepDurChart?.resize(); window.sleepBedChart?.resize(); }catch(e){} }, 0);
+    setTimeout(()=>{ try{ window.sleepDurChart?.resize(); window.sleepBedChart?.resize(); window.weeklyPatternChart?.resize(); }catch(e){} }, 0);
     setProgress(100, "Sleep dashboard ready");
   }
 
