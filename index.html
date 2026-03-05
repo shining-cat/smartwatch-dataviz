@@ -142,12 +142,23 @@
               <div class="muted" style="margin-top:6px">Calendar heatmap + weekday averages.</div>
         <div id="controlsSleep" style="display:none">
           <div class="card" style="padding:12px">
-            <div class="row" style="justify-content:space-between; align-items:center">
+            <div class="row" style="justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px">
               <h2 style="margin:0">Sleep dashboard</h2>
-              <button id="renderSleepBtn" title="Render sleep charts">Render sleep</button>
+              <div class="row" style="gap:10px; align-items:center">
+                <label for="sleepRangeSelect" style="margin:0" title="Filter all sleep data by date range. All charts and stats will update.">Date Range:</label>
+                <select id="sleepRangeSelect" style="width:150px">
+                  <option value="1m">Last month</option>
+                  <option value="3m">Last 3 months</option>
+                  <option value="6m">Last 6 months</option>
+                  <option value="1y">Last 1 year</option>
+                  <option value="2y">Last 2 years</option>
+                  <option value="all" selected>All time</option>
+                </select>
+                <button id="renderSleepBtn" title="Render sleep charts">Render sleep</button>
+              </div>
             </div>
             <div class="muted" style="margin-top:6px">
-              Shows nightly duration + bedtime scatter (time-of-day). Metrics are derived from sleep.csv and assigned to the wake-up date.
+              Master date range filters all charts and stats on this page. Change range and click Render to update.
             </div>
           </div>
         </div>
@@ -1974,9 +1985,74 @@
     }, 0);
   }
 
+  /**
+   * Filter data by date range (helper for master date range selector)
+   */
+  function filterByDateRange(data, cutoffDate) {
+    if (!cutoffDate || !data) return data;
+    const cutoffStr = cutoffDate.toISOString().split('T')[0];
+
+    if (Array.isArray(data)) {
+      // Filter array of records (for sleep records)
+      return data.filter(record => {
+        if (!record.date) return true;
+        return record.date >= cutoffStr;
+      });
+    } else if (data.dates && data.values) {
+      // Filter parallel arrays (for time series like computeSleepInsights)
+      const filtered = { dates: [], values: [] };
+      for (let i = 0; i < data.dates.length; i++) {
+        if (data.dates[i] >= cutoffStr) {
+          filtered.dates.push(data.dates[i]);
+          filtered.values.push(data.values[i]);
+        }
+      }
+      return filtered;
+    }
+    return data;
+  }
+
   async function renderSleepDashboard(){
     setProgress(20, "Rendering sleep dashboard…");
+
+    // Get master date range filter
+    const rangeSelect = $("sleepRangeSelect");
+    const selectedRange = rangeSelect ? rangeSelect.value : 'all';
+
+    // Calculate cutoff date based on selected range
+    let cutoffDate = null;
+    if (selectedRange !== 'all') {
+      const now = new Date();
+      cutoffDate = new Date(now);
+
+      switch(selectedRange) {
+        case '1m': cutoffDate.setMonth(now.getMonth() - 1); break;
+        case '3m': cutoffDate.setMonth(now.getMonth() - 3); break;
+        case '6m': cutoffDate.setMonth(now.getMonth() - 6); break;
+        case '1y': cutoffDate.setFullYear(now.getFullYear() - 1); break;
+        case '2y': cutoffDate.setFullYear(now.getFullYear() - 2); break;
+      }
+    }
+
     const ins = await computeSleepInsights();
+
+    // Apply date range filter to time series data
+    if (cutoffDate) {
+      ins.dur = filterByDateRange(ins.dur, cutoffDate);
+      ins.bd = filterByDateRange(ins.bd, cutoffDate);
+
+      // Recalculate stats for filtered data (for overview cards)
+      if (ins.dur.values.length > 0) {
+        const last30 = ins.dur.values.slice(Math.max(0, ins.dur.values.length - 30));
+        ins.avg30 = mean(last30);
+        ins.overallAvg = mean(ins.dur.values);
+        ins.pctBelow6 = last30.filter(v => v < 360).length / last30.length;
+      }
+      if (ins.bd.values.length > 0) {
+        const last30Bed = ins.bd.values.slice(Math.max(0, ins.bd.values.length - 30));
+        ins.bedtimeStd = std(last30Bed);
+      }
+    }
 
     // cards
     const cardsEl = $("sleepInsightCards");
@@ -2077,7 +2153,12 @@
     }
 
     // Use validated records for analysis
-    const validSleepRecords = validation.validRecords;
+    let validSleepRecords = validation.validRecords;
+
+    // Apply date range filter to Sleep Deep Dive data
+    if (cutoffDate) {
+      validSleepRecords = filterByDateRange(validSleepRecords, cutoffDate);
+    }
 
     // Agent 1: Duration Analysis
     setProgress(75, "Analyzing sleep duration patterns…");
@@ -2101,7 +2182,12 @@
 
     // Agent 3: Weekly Pattern Detection
     setProgress(85, "Analyzing weekly patterns…");
-    const sleepData = await fetchSleepData();
+    let sleepData = await fetchSleepData();
+
+    // Apply date range filter to weekly patterns data
+    if (cutoffDate) {
+      sleepData = filterByDateRange(sleepData, cutoffDate);
+    }
 
     // Delay chart initialization to ensure container is visible and measured
     await new Promise(resolve => setTimeout(resolve, 100));
