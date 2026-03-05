@@ -1271,6 +1271,249 @@
   // END SLEEP DURATION ANALYSIS COMPONENT
   // ========================================
 
+  // ========================================
+  // SLEEP TIMING PATTERNS COMPONENT
+  // (Agent 2 of 3 - Sleep Deep Dive)
+  // ========================================
+
+  /**
+   * Extract bedtimes from sleep data
+   * @param {Array} sleepData - Array of sleep session objects with from/to datetimes
+   * @returns {Array} Array of {date, bedtimeHour} where bedtimeHour is decimal (e.g., 23.5 = 11:30 PM)
+   */
+  function extractBedtimes(sleepData){
+    const result = [];
+    for (const session of sleepData){
+      try {
+        if (!session.from || !session.date) continue;
+        const bedtime = new Date(session.from);
+        if (isNaN(bedtime.getTime())) continue;
+
+        // Convert to decimal hours (e.g., 23:30 = 23.5)
+        const bedtimeHour = bedtime.getHours() + bedtime.getMinutes() / 60;
+
+        // For visualization: bedtimes after midnight (0-6 AM) are treated as 24-30 for continuity
+        const adjustedHour = bedtimeHour < 6 ? bedtimeHour + 24 : bedtimeHour;
+
+        result.push({
+          date: session.date,
+          bedtimeHour: adjustedHour
+        });
+      } catch(e){
+        console.warn("Error extracting bedtime:", e, session);
+      }
+    }
+    return result;
+  }
+
+  /**
+   * Extract wake times from sleep data
+   * @param {Array} sleepData - Array of sleep session objects with from/to datetimes
+   * @returns {Array} Array of {date, wakeTimeHour} where wakeTimeHour is decimal
+   */
+  function extractWakeTimes(sleepData){
+    const result = [];
+    for (const session of sleepData){
+      try {
+        if (!session.to || !session.date) continue;
+        const wakeTime = new Date(session.to);
+        if (isNaN(wakeTime.getTime())) continue;
+
+        // Convert to decimal hours
+        const wakeTimeHour = wakeTime.getHours() + wakeTime.getMinutes() / 60;
+
+        result.push({
+          date: session.date,
+          wakeTimeHour: wakeTimeHour
+        });
+      } catch(e){
+        console.warn("Error extracting wake time:", e, session);
+      }
+    }
+    return result;
+  }
+
+  /**
+   * Calculate timing consistency metrics
+   * @param {Array} sleepData - Array of sleep session objects
+   * @returns {Object} {bedtimeStdDev, wakeTimeStdDev, consistencyScore}
+   */
+  function calculateTimingConsistency(sleepData){
+    const bedtimes = extractBedtimes(sleepData);
+    const wakeTimes = extractWakeTimes(sleepData);
+
+    if (bedtimes.length === 0 || wakeTimes.length === 0){
+      return { bedtimeStdDev: null, wakeTimeStdDev: null, consistencyScore: null };
+    }
+
+    // Calculate standard deviation for bedtimes
+    const bedHours = bedtimes.map(b => b.bedtimeHour);
+    const bedtimeStdDev = std(bedHours);
+
+    // Calculate standard deviation for wake times
+    const wakeHours = wakeTimes.map(w => w.wakeTimeHour);
+    const wakeTimeStdDev = std(wakeHours);
+
+    // Consistency score: inverse of average std dev (lower variation = higher consistency)
+    // Scale to 0-100 where 100 is perfect consistency
+    const avgStdDev = (bedtimeStdDev + wakeTimeStdDev) / 2;
+    const consistencyScore = avgStdDev != null ? Math.max(0, Math.min(100, 100 - (avgStdDev * 10))) : null;
+
+    console.log("Timing consistency:", {
+      bedtimeStdDev: bedtimeStdDev?.toFixed(2),
+      wakeTimeStdDev: wakeTimeStdDev?.toFixed(2),
+      consistencyScore: consistencyScore?.toFixed(1)
+    });
+
+    return { bedtimeStdDev, wakeTimeStdDev, consistencyScore };
+  }
+
+  /**
+   * Detect chronotype based on average bedtime
+   * @param {Array} sleepData - Array of sleep session objects
+   * @returns {string} 'early-bird' | 'night-owl' | 'intermediate'
+   */
+  function detectChronotype(sleepData){
+    const bedtimes = extractBedtimes(sleepData);
+
+    if (bedtimes.length < 7){
+      return 'intermediate'; // Not enough data
+    }
+
+    // Calculate average bedtime (using adjusted hours for proper averaging)
+    const avgBedtime = mean(bedtimes.map(b => b.bedtimeHour));
+
+    console.log("Chronotype detection - avg bedtime:", avgBedtime?.toFixed(2));
+
+    if (avgBedtime == null) return 'intermediate';
+
+    // Normalize back to 0-24 range for comparison
+    const normalizedBedtime = avgBedtime > 24 ? avgBedtime - 24 : avgBedtime;
+
+    // Early-bird: avg bedtime < 22:00 (10 PM)
+    if (normalizedBedtime < 22) return 'early-bird';
+
+    // Night-owl: avg bedtime > 24:00 (midnight) - which in adjusted scale is > 24
+    if (avgBedtime > 24) return 'night-owl';
+
+    // Intermediate: between 22:00 and midnight
+    return 'intermediate';
+  }
+
+  /**
+   * Fetch structured sleep session data from the database
+   * Reconstructs from the separate metrics stored in daily table
+   * @returns {Promise<Array>} Array of sleep session objects
+   */
+  async function fetchSleepSessions(){
+    try {
+      // Fetch all three sleep metrics
+      const durData = await fetchDailySeries("sleep_duration_min");
+      const bedData = await fetchDailySeries("sleep_bedtime_min");
+      const wakeData = await fetchDailySeries("sleep_wake_min");
+
+      // Create a map keyed by date
+      const sessionMap = new Map();
+
+      // Process duration data
+      durData.dates.forEach((date, i) => {
+        sessionMap.set(date, {
+          date: date,
+          durationMinutes: durData.values[i]
+        });
+      });
+
+      // Add bedtime and wake time information
+      // Note: bedtime_min and wake_min are minutes since midnight
+      bedData.dates.forEach((date, i) => {
+        const session = sessionMap.get(date);
+        if (session){
+          const bedtimeMin = bedData.values[i];
+          // Reconstruct approximate bedtime datetime
+          // If bedtime is after 18:00, it's same day; otherwise it's previous day
+          const dateObj = new Date(date + "T00:00:00");
+          if (bedtimeMin >= 18 * 60) {
+            // Same day (evening)
+            dateObj.setMinutes(bedtimeMin);
+          } else {
+            // Previous day (after midnight)
+            dateObj.setDate(dateObj.getDate() - 1);
+            dateObj.setMinutes(bedtimeMin);
+          }
+          session.from = dateObj.toISOString();
+        }
+      });
+
+      wakeData.dates.forEach((date, i) => {
+        const session = sessionMap.get(date);
+        if (session){
+          const wakeMin = wakeData.values[i];
+          // Wake time is on the date itself
+          const dateObj = new Date(date + "T00:00:00");
+          dateObj.setMinutes(wakeMin);
+          session.to = dateObj.toISOString();
+        }
+      });
+
+      // Filter to sessions that have both from and to
+      const sessions = Array.from(sessionMap.values())
+        .filter(s => s.from && s.to)
+        .sort((a, b) => a.date.localeCompare(b.date));
+
+      console.log(`Fetched ${sessions.length} sleep sessions`);
+      return sessions;
+
+    } catch(e){
+      console.error("Error fetching sleep sessions:", e);
+      return [];
+    }
+  }
+
+  /**
+   * Main rendering function for Sleep Timing Patterns
+   * @param {Array} sleepData - Array of sleep session objects
+   * @param {string} containerId - ID of container element (not used in v1, renders to existing sections)
+   */
+  async function renderSleepTiming(sleepData, containerId){
+    console.log("Rendering sleep timing patterns...");
+
+    // Validate data
+    if (!sleepData || sleepData.length < 7){
+      console.warn("Insufficient sleep data for timing analysis (need at least 7 nights)");
+      // Could show a message in UI here if needed
+      return;
+    }
+
+    // Extract timing data
+    const bedtimes = extractBedtimes(sleepData);
+    const wakeTimes = extractWakeTimes(sleepData);
+
+    if (bedtimes.length === 0 || wakeTimes.length === 0){
+      console.warn("No valid timing data extracted");
+      return;
+    }
+
+    // Calculate insights
+    const consistency = calculateTimingConsistency(sleepData);
+    const chronotype = detectChronotype(sleepData);
+
+    console.log("Timing insights:", { consistency, chronotype });
+
+    // Note: In this v1 implementation, we're not creating new chart containers
+    // The timing patterns are already visualized in the existing bedtime scatter chart
+    // A future v2 could add dedicated side-by-side bedtime/wake time charts
+
+    // For now, just log the analysis results
+    console.log("Bedtime consistency (std dev):", consistency.bedtimeStdDev?.toFixed(2), "hours");
+    console.log("Wake time consistency (std dev):", consistency.wakeTimeStdDev?.toFixed(2), "hours");
+    console.log("Overall consistency score:", consistency.consistencyScore?.toFixed(1), "/100");
+    console.log("Detected chronotype:", chronotype);
+  }
+
+  // ========================================
+  // END SLEEP TIMING PATTERNS COMPONENT
+  // ========================================
+
   async function computeSleepInsights(){
     const dur = await fetchDailySeries("sleep_duration_min");
     const bd = await fetchDailySeries("sleep_bedtime_min");
