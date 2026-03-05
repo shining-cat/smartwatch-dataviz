@@ -194,12 +194,12 @@
           <div style="margin-bottom:20px">
             <h3 style="font-size:14px; margin-bottom:6px; font-weight:600">Duration Over Time</h3>
             <div id="sleepDurationChart" class="chart" style="height:260px"></div>
-            <div class="muted" style="margin-top:6px">Daily sleep duration with 30-day rolling average</div>
+            <div class="muted" style="margin-top:6px; cursor:help" title="The rolling average smooths out day-to-day variations to show longer-term trends. Each point averages the last 30 days.">Daily sleep duration with 30-day rolling average</div>
           </div>
 
           <!-- Histogram view -->
           <div>
-            <h3 style="font-size:14px; margin-bottom:6px; font-weight:600">Duration Distribution</h3>
+            <h3 style="font-size:14px; margin-bottom:6px; font-weight:600" title="Shows how your sleep duration is distributed across different time ranges">Duration Distribution</h3>
             <div id="sleepDeepDiveDuration"></div>
           </div>
         </div>
@@ -232,14 +232,14 @@
 
           <!-- Weekly bar chart -->
           <div style="margin-bottom:20px">
-            <h3 style="font-size:14px; margin-bottom:6px; font-weight:600">Average Sleep by Weekday</h3>
+            <h3 style="font-size:14px; margin-bottom:6px; font-weight:600" title="Shows your average sleep duration for each day of the week (Sunday through Saturday)">Average Sleep by Weekday</h3>
             <div id="weeklyPatternChart" class="chart" style="height:320px"></div>
-            <div class="muted" style="margin-top:6px">Bars colored by deviation from weekly mean (green: above, red: below)</div>
+            <div class="muted" style="margin-top:6px; cursor:help" title="Green bars: you sleep significantly more than your weekly average on these days. Red bars: significantly less. Blue: normal range. Weekdays = Mon-Fri, Weekend = Sat-Sun.">Bars colored by deviation from weekly mean (green: above, red: below)</div>
           </div>
 
           <!-- Pattern insights -->
           <div>
-            <h3 style="font-size:14px; margin-bottom:6px; font-weight:600">Pattern Insights</h3>
+            <h3 style="font-size:14px; margin-bottom:6px; font-weight:600" title="Identifies significant patterns in your weekly sleep, such as differences between weekdays and weekends, or specific days that stand out">Pattern Insights</h3>
             <div id="weeklyPatternInsights" style="display:flex; gap:8px; flex-wrap:wrap; flex-direction:column;"></div>
           </div>
         </div>
@@ -1247,21 +1247,21 @@
 
           <!-- Summary Stats -->
           <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px; margin-bottom: 20px;">
-            <div style="padding: 12px; background: rgba(255,255,255,0.02); border-radius: 8px;">
+            <div style="padding: 12px; background: rgba(255,255,255,0.02); border-radius: 8px; cursor: help;" title="Mean sleep duration across all nights in your dataset">
               <div style="font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px;">Average</div>
               <div style="font-size: 20px; font-weight: 700; margin-top: 4px; color: var(--fg);">${stats.avg.toFixed(1)}h</div>
             </div>
-            <div style="padding: 12px; background: rgba(255,255,255,0.02); border-radius: 8px;">
+            <div style="padding: 12px; background: rgba(255,255,255,0.02); border-radius: 8px; cursor: help;" title="Middle value when all nights are sorted by duration. Less affected by extreme values than average.">
               <div style="font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px;">Median</div>
               <div style="font-size: 20px; font-weight: 700; margin-top: 4px; color: var(--fg);">${stats.median.toFixed(1)}h</div>
             </div>
-            <div style="padding: 12px; background: rgba(255,255,255,0.02); border-radius: 8px;">
+            <div style="padding: 12px; background: rgba(255,255,255,0.02); border-radius: 8px; cursor: help;" title="How consistent your sleep duration is (0-100). Higher = more regular sleep schedule. Based on coefficient of variation (std dev / mean).">
               <div style="font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px;">Consistency</div>
               <div style="font-size: 20px; font-weight: 700; margin-top: 4px; color: ${stats.consistencyScore >= 70 ? 'var(--good)' : stats.consistencyScore >= 50 ? 'var(--warn)' : 'var(--bad)'};">
                 ${stats.consistencyScore ? Math.round(stats.consistencyScore) : '—'}%
               </div>
             </div>
-            <div style="padding: 12px; background: rgba(255,255,255,0.02); border-radius: 8px;">
+            <div style="padding: 12px; background: rgba(255,255,255,0.02); border-radius: 8px; cursor: help;" title="Shortest to longest sleep duration in your dataset">
               <div style="font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px;">Range</div>
               <div style="font-size: 14px; font-weight: 600; margin-top: 4px; color: var(--fg);">${stats.min.toFixed(1)}h - ${stats.max.toFixed(1)}h</div>
             </div>
@@ -1269,9 +1269,12 @@
 
           <!-- Histogram Chart -->
           <div id="${containerId}_chart" style="width: 100%; height: 280px;"></div>
+          <div style="font-size: 11px; color: var(--muted); text-align: center; margin-top: 6px; cursor: help;" title="Green bars (7-9h) represent the generally recommended healthy sleep duration range for adults">
+            Green bars indicate healthy sleep range (7-9h)
+          </div>
 
           <!-- Footer info -->
-          <div style="margin-top: 12px; font-size: 12px; color: var(--muted); text-align: center;">
+          <div style="margin-top: 12px; font-size: 12px; color: var(--muted); text-align: center; cursor: help;" title="Standard deviation measures how much your sleep duration varies from night to night. Lower = more consistent.">
             ${stats.totalNights} nights analyzed • Std Dev: ${stats.stdDev.toFixed(2)}h
           </div>
         </div>
@@ -1600,29 +1603,29 @@
       return;
     }
 
-    // Create insight cards
+    // Create insight cards with helpful tooltips
     const cardHTML = `
       <div style="display: flex; gap: 12px; flex-wrap: wrap; margin-top: 12px;">
-        <div class="insight-card">
+        <div class="insight-card" title="Your natural sleep-wake preference based on average bedtime. Early-bird: before 10 PM, Night-owl: after midnight, Intermediate: in between.">
           <div style="font-size:12px;color:#9fb0c3;">Chronotype</div>
           <div style="font-size:18px;font-weight:700;margin-top:6px">${chronotype || 'Unknown'}</div>
           <div class="muted" style="margin-top:6px">Sleep timing pattern</div>
         </div>
-        <div class="insight-card">
+        <div class="insight-card" title="How much your bedtime varies night to night. Lower is more consistent. Standard deviation measures spread from your average bedtime.">
           <div style="font-size:12px;color:#9fb0c3;">Bedtime Consistency</div>
           <div style="font-size:18px;font-weight:700;margin-top:6px">
             ${consistency.bedtimeStdDev != null ? consistency.bedtimeStdDev.toFixed(1) + 'h' : 'N/A'}
           </div>
           <div class="muted" style="margin-top:6px">Standard deviation</div>
         </div>
-        <div class="insight-card">
+        <div class="insight-card" title="How much your wake time varies morning to morning. Lower is more consistent. Standard deviation measures spread from your average wake time.">
           <div style="font-size:12px;color:#9fb0c3;">Wake Time Consistency</div>
           <div style="font-size:18px;font-weight:700;margin-top:6px">
             ${consistency.wakeTimeStdDev != null ? consistency.wakeTimeStdDev.toFixed(1) + 'h' : 'N/A'}
           </div>
           <div class="muted" style="margin-top:6px">Standard deviation</div>
         </div>
-        <div class="insight-card">
+        <div class="insight-card" title="Overall timing consistency score (0-100). Combines bedtime and wake time regularity. Higher scores indicate more consistent sleep schedule.">
           <div style="font-size:12px;color:#9fb0c3;">Overall Consistency Score</div>
           <div style="font-size:18px;font-weight:700;margin-top:6px">
             ${consistency.consistencyScore != null ? consistency.consistencyScore.toFixed(0) + '/100' : 'N/A'}
@@ -1976,18 +1979,19 @@
     const cardsEl = $("sleepInsightCards");
     if (cardsEl){
       cardsEl.innerHTML = "";
-      const mk = (title, main, sub) => {
+      const mk = (title, main, sub, tooltip) => {
         const d = document.createElement("div");
         d.className="insight-card";
+        if (tooltip) d.title = tooltip;
         d.innerHTML = `<div style="font-size:12px;color:#9fb0c3;">${title}</div>
                        <div style="font-size:18px;font-weight:700;margin-top:6px">${main}</div>
                        <div class="muted" style="margin-top:6px">${sub}</div>`;
         return d;
       };
-      cardsEl.appendChild(mk("Last 30d avg", fmtHoursMins(ins.avg30), "Average nightly sleep"));
-      cardsEl.appendChild(mk("Overall avg", fmtHoursMins(ins.overallAvg), "Since first recorded night"));
-      cardsEl.appendChild(mk("Nights < 6h (30d)", `${Math.round(ins.pctBelow6*100)}%`, "Percent nights under 6 hours"));
-      cardsEl.appendChild(mk("Bedtime variability (30d)", ins.bedtimeStd!=null ? `${Math.round(ins.bedtimeStd)} min` : "—", "How much bedtime varies"));
+      cardsEl.appendChild(mk("Last 30d avg", fmtHoursMins(ins.avg30), "Average nightly sleep", "Your average sleep duration over the last 30 nights"));
+      cardsEl.appendChild(mk("Overall avg", fmtHoursMins(ins.overallAvg), "Since first recorded night", "Your average sleep duration across all recorded nights in your dataset"));
+      cardsEl.appendChild(mk("Nights < 6h (30d)", `${Math.round(ins.pctBelow6*100)}%`, "Percent nights under 6 hours", "What percentage of the last 30 nights you slept less than 6 hours (generally considered insufficient sleep)"));
+      cardsEl.appendChild(mk("Bedtime variability (30d)", ins.bedtimeStd!=null ? `${Math.round(ins.bedtimeStd)} min` : "—", "How much bedtime varies", "Standard deviation of bedtime over the last 30 nights. Lower numbers = more consistent bedtime schedule"));
     }
 
     // duration chart
