@@ -278,11 +278,19 @@
     meta: "key",
     overrides: "[metric+date], metric, date"
   });
+  // v3 adds sleepRecords table for Sleep Deep Dive components
+  db.version(3).stores({
+    daily: "[metric+date], metric, date",
+    meta: "key",
+    overrides: "[metric+date], metric, date",
+    sleepRecords: "date, from, to"
+  });
 
   async function wipeStorage(){
     await db.daily.clear();
     await db.meta.clear();
     if (db.overrides) await db.overrides.clear();
+    if (db.sleepRecords) await db.sleepRecords.clear();
     setStatus("no data loaded");
     $("kpis").style.display = "none";
     $("metricSelect").innerHTML = "";
@@ -360,13 +368,21 @@
 
   async function parseAndStoreDailyCSV(filename, metric, csvText){
     const rowsBuffer = [];
+    const sleepRecordsBuffer = [];
     const BATCH = 2000;
     const lower = filename.toLowerCase();
 
     function flush(){
-      if (rowsBuffer.length === 0) return Promise.resolve();
-      const chunk = rowsBuffer.splice(0, rowsBuffer.length);
-      return db.daily.bulkPut(chunk);
+      const promises = [];
+      if (rowsBuffer.length > 0) {
+        const chunk = rowsBuffer.splice(0, rowsBuffer.length);
+        promises.push(db.daily.bulkPut(chunk));
+      }
+      if (sleepRecordsBuffer.length > 0 && db.sleepRecords) {
+        const chunk = sleepRecordsBuffer.splice(0, sleepRecordsBuffer.length);
+        promises.push(db.sleepRecords.bulkPut(chunk));
+      }
+      return Promise.all(promises);
     }
 
     return new Promise((resolve, reject) => {
@@ -439,14 +455,34 @@
               value = Math.max(0, (toDt.getTime() - fromDt.getTime())/60000);
               // For daily grouping, we assign the sleep to the wake-up day (the "to" date)
               iso = isoDateFromEpochMs(toDt.getTime());
-            
+
               try {
                 const bdMin = fromDt.getHours()*60 + fromDt.getMinutes();
                 const wdMin = toDt.getHours()*60 + toDt.getMinutes();
                 rowsBuffer.push({ metric: "sleep_bedtime_min", date: iso, value: bdMin });
                 rowsBuffer.push({ metric: "sleep_wake_min", date: iso, value: wdMin });
+
+                // Store full sleep record for Sleep Deep Dive components
+                const durationMinutes = value;
+                const durationHours = Math.round((durationMinutes / 60) * 100) / 100;
+                const dayOfWeek = toDt.getDay();
+                const weekdayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+                sleepRecordsBuffer.push({
+                  date: iso,
+                  from: fromDt.toISOString(),
+                  to: toDt.toISOString(),
+                  durationMinutes,
+                  durationHours,
+                  dayOfWeek,
+                  weekdayName: weekdayNames[dayOfWeek]
+                });
+
+                if (sleepRecordsBuffer.length >= BATCH && db.sleepRecords){
+                  const chunk = sleepRecordsBuffer.splice(0, sleepRecordsBuffer.length);
+                  db.sleepRecords.bulkPut(chunk).catch(console.error);
+                }
               } catch(e){}
-} else {
+            } else {
               // Fallback: try to sum stage seconds if present
               const stageKeys = ['light (s)', 'deep (s)', 'rem (s)'];
               let sumSec = 0;
@@ -925,6 +961,306 @@
     const m = mean(arr);
     return Math.sqrt(arr.reduce((a,b)=>a+(b-m)*(b-m),0)/arr.length);
   }
+
+  // ========================================
+  // SLEEP DURATION ANALYSIS COMPONENT (Agent 1)
+  // ========================================
+
+  /**
+   * Fetch sleep records from the database
+   * Returns array matching SLEEP DATA MODEL CONTRACT
+   */
+  async function fetchSleepRecords() {
+    try {
+      if (!db.sleepRecords) {
+        console.warn('Sleep records table not available');
+        return [];
+      }
+      const records = await db.sleepRecords.toArray();
+      return records.sort((a, b) => a.date.localeCompare(b.date));
+    } catch (error) {
+      console.error('Error fetching sleep records:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Calculate sleep duration statistics
+   * @param {Array} sleepData - Array of sleep records (SLEEP DATA MODEL CONTRACT)
+   * @returns {Object} Statistics including avg, median, stdDev, min, max, percentiles, distribution
+   */
+  function calculateSleepStats(sleepData) {
+    try {
+      // Filter out invalid data
+      const validData = sleepData.filter(record => {
+        if (!record || !record.durationHours) return false;
+        const dur = record.durationHours;
+        return dur > 0 && dur <= 24 && !isNaN(dur);
+      });
+
+      if (validData.length === 0) {
+        return null;
+      }
+
+      const durations = validData.map(r => r.durationHours);
+      durations.sort((a, b) => a - b);
+
+      // Calculate statistics
+      const avg = mean(durations);
+      const stdDev = std(durations);
+      const min = Math.min(...durations);
+      const max = Math.max(...durations);
+
+      // Calculate median and percentiles
+      const getPercentile = (arr, p) => {
+        const index = Math.ceil((arr.length * p) / 100) - 1;
+        return arr[Math.max(0, index)];
+      };
+
+      const median = getPercentile(durations, 50);
+      const p25 = getPercentile(durations, 25);
+      const p75 = getPercentile(durations, 75);
+
+      // Calculate consistency score (0-100, higher is more consistent)
+      // Based on coefficient of variation (CV), inverted and scaled
+      const consistencyScore = stdDev && avg
+        ? Math.max(0, Math.min(100, 100 - (stdDev / avg) * 100))
+        : null;
+
+      console.log('Sleep Duration Stats:', {
+        count: validData.length,
+        avg: avg?.toFixed(2),
+        median: median?.toFixed(2),
+        stdDev: stdDev?.toFixed(2),
+        consistencyScore: consistencyScore?.toFixed(0)
+      });
+
+      return {
+        avg,
+        median,
+        stdDev,
+        min,
+        max,
+        percentiles: { p25, p50: median, p75 },
+        consistencyScore,
+        totalNights: validData.length
+      };
+    } catch (error) {
+      console.error('Error calculating sleep stats:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Generate histogram data for duration distribution
+   * @param {Array} sleepData - Array of sleep records
+   * @returns {Object} Histogram data suitable for ECharts
+   */
+  function generateDurationHistogram(sleepData) {
+    try {
+      // Filter valid data
+      const validData = sleepData.filter(record => {
+        if (!record || !record.durationHours) return false;
+        const dur = record.durationHours;
+        return dur > 0 && dur <= 24 && !isNaN(dur);
+      });
+
+      if (validData.length === 0) {
+        return { bins: [], counts: [] };
+      }
+
+      // Define bins: <5h, 5-6h, 6-7h, 7-8h, 8-9h, >9h
+      const bins = [
+        { label: '<5h', min: 0, max: 5 },
+        { label: '5-6h', min: 5, max: 6 },
+        { label: '6-7h', min: 6, max: 7 },
+        { label: '7-8h', min: 7, max: 8 },
+        { label: '8-9h', min: 8, max: 9 },
+        { label: '>9h', min: 9, max: 24 }
+      ];
+
+      const counts = bins.map(bin => {
+        return validData.filter(r =>
+          r.durationHours >= bin.min && r.durationHours < bin.max
+        ).length;
+      });
+
+      return {
+        bins: bins.map(b => b.label),
+        counts,
+        total: validData.length
+      };
+    } catch (error) {
+      console.error('Error generating histogram:', error);
+      return { bins: [], counts: [] };
+    }
+  }
+
+  /**
+   * Render Sleep Duration Analysis Component
+   * @param {Array} sleepData - Array of sleep records
+   * @param {string} containerId - DOM element ID to render into
+   */
+  async function renderSleepDuration(sleepData, containerId) {
+    const container = document.getElementById(containerId);
+    if (!container) {
+      console.error(`Container ${containerId} not found`);
+      return;
+    }
+
+    try {
+      // Handle no data case
+      if (!sleepData || sleepData.length === 0) {
+        container.innerHTML = `
+          <div class="card" style="text-align: center; padding: 40px;">
+            <div style="color: var(--muted); font-size: 14px;">
+              No sleep data available. Upload your health export to get started.
+            </div>
+          </div>
+        `;
+        return;
+      }
+
+      // Calculate statistics
+      const stats = calculateSleepStats(sleepData);
+      if (!stats) {
+        container.innerHTML = `
+          <div class="card" style="text-align: center; padding: 40px;">
+            <div style="color: var(--warn); font-size: 14px;">
+              Unable to calculate sleep statistics. Data may be corrupted.
+            </div>
+          </div>
+        `;
+        return;
+      }
+
+      // Generate histogram
+      const histogram = generateDurationHistogram(sleepData);
+
+      // Create container HTML
+      container.innerHTML = `
+        <div class="card">
+          <h2>Sleep Duration Analysis</h2>
+
+          <!-- Summary Stats -->
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px; margin-bottom: 20px;">
+            <div style="padding: 12px; background: rgba(255,255,255,0.02); border-radius: 8px;">
+              <div style="font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px;">Average</div>
+              <div style="font-size: 20px; font-weight: 700; margin-top: 4px; color: var(--fg);">${stats.avg.toFixed(1)}h</div>
+            </div>
+            <div style="padding: 12px; background: rgba(255,255,255,0.02); border-radius: 8px;">
+              <div style="font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px;">Median</div>
+              <div style="font-size: 20px; font-weight: 700; margin-top: 4px; color: var(--fg);">${stats.median.toFixed(1)}h</div>
+            </div>
+            <div style="padding: 12px; background: rgba(255,255,255,0.02); border-radius: 8px;">
+              <div style="font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px;">Consistency</div>
+              <div style="font-size: 20px; font-weight: 700; margin-top: 4px; color: ${stats.consistencyScore >= 70 ? 'var(--good)' : stats.consistencyScore >= 50 ? 'var(--warn)' : 'var(--bad)'};">
+                ${stats.consistencyScore ? Math.round(stats.consistencyScore) : '—'}%
+              </div>
+            </div>
+            <div style="padding: 12px; background: rgba(255,255,255,0.02); border-radius: 8px;">
+              <div style="font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px;">Range</div>
+              <div style="font-size: 14px; font-weight: 600; margin-top: 4px; color: var(--fg);">${stats.min.toFixed(1)}h - ${stats.max.toFixed(1)}h</div>
+            </div>
+          </div>
+
+          <!-- Histogram Chart -->
+          <div id="${containerId}_chart" style="width: 100%; height: 280px;"></div>
+
+          <!-- Footer info -->
+          <div style="margin-top: 12px; font-size: 12px; color: var(--muted); text-align: center;">
+            ${stats.totalNights} nights analyzed • Std Dev: ${stats.stdDev.toFixed(2)}h
+          </div>
+        </div>
+      `;
+
+      // Render ECharts histogram
+      const chartContainer = document.getElementById(`${containerId}_chart`);
+      if (chartContainer && window.echarts) {
+        const chart = echarts.init(chartContainer, null, { renderer: 'canvas' });
+
+        // Highlight healthy range (7-9h)
+        const itemColors = histogram.bins.map(bin => {
+          if (bin === '7-8h' || bin === '8-9h') return 'var(--good)';
+          if (bin === '6-7h') return 'var(--accent)';
+          return 'var(--muted)';
+        });
+
+        chart.setOption({
+          backgroundColor: 'transparent',
+          tooltip: {
+            trigger: 'axis',
+            axisPointer: { type: 'shadow' },
+            formatter: (params) => {
+              const p = params[0];
+              const percent = ((p.value / histogram.total) * 100).toFixed(1);
+              return `${p.name}<br/>${p.value} nights (${percent}%)`;
+            }
+          },
+          grid: {
+            left: '3%',
+            right: '4%',
+            bottom: '3%',
+            top: '10%',
+            containLabel: true
+          },
+          xAxis: {
+            type: 'category',
+            data: histogram.bins,
+            axisLabel: { color: 'var(--muted)', fontSize: 11 },
+            axisLine: { lineStyle: { color: '#2a3a55' } }
+          },
+          yAxis: {
+            type: 'value',
+            axisLabel: { color: 'var(--muted)', fontSize: 11 },
+            axisLine: { lineStyle: { color: '#2a3a55' } },
+            splitLine: { lineStyle: { color: '#1f2a3a' } }
+          },
+          series: [{
+            name: 'Nights',
+            type: 'bar',
+            data: histogram.counts,
+            itemStyle: {
+              color: (params) => {
+                const bin = histogram.bins[params.dataIndex];
+                if (bin === '7-8h' || bin === '8-9h') return '#3dce79';
+                if (bin === '6-7h') return '#3aa0ff';
+                return '#9fb0c3';
+              },
+              borderRadius: [4, 4, 0, 0]
+            },
+            barMaxWidth: 60,
+            label: {
+              show: true,
+              position: 'top',
+              color: 'var(--fg)',
+              fontSize: 11,
+              formatter: '{c}'
+            }
+          }]
+        });
+
+        // Handle resize
+        window.addEventListener('resize', () => {
+          try { chart.resize(); } catch (e) {}
+        });
+      }
+
+    } catch (error) {
+      console.error('Error rendering sleep duration:', error);
+      container.innerHTML = `
+        <div class="card" style="text-align: center; padding: 40px;">
+          <div style="color: var(--bad); font-size: 14px;">
+            Error rendering sleep duration analysis. Check console for details.
+          </div>
+        </div>
+      `;
+    }
+  }
+
+  // ========================================
+  // END SLEEP DURATION ANALYSIS COMPONENT
+  // ========================================
 
   async function computeSleepInsights(){
     const dur = await fetchDailySeries("sleep_duration_min");
