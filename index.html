@@ -198,6 +198,18 @@
           <h2 style="margin-bottom:6px">Pattern insights</h2>
           <div id="weeklyPatternInsights" style="display:flex; gap:8px; flex-wrap:wrap; flex-direction:column;"></div>
         </div>
+
+        <!-- Sleep Deep Dive Components (Agent 1, 2, 3) -->
+        <div class="card" style="margin-top:10px">
+          <h2 style="margin-bottom:6px">Sleep Deep Dive: Duration Analysis</h2>
+          <div id="sleepDeepDiveDuration"></div>
+        </div>
+
+        <div class="card" style="margin-top:10px">
+          <h2 style="margin-bottom:6px">Sleep Deep Dive: Timing Patterns</h2>
+          <div id="sleepDeepDiveTiming"></div>
+        </div>
+
       </div>
 
       </div>
@@ -1868,8 +1880,37 @@
       }, true);
     }
 
-    // Weekly pattern analysis and rendering
-    setProgress(80, "Analyzing weekly patterns…");
+    // ========================================
+    // SLEEP DEEP DIVE COMPONENTS INTEGRATION
+    // (Agents 1, 2, 3 working in coordination)
+    // ========================================
+
+    // Fetch sleep records for all three agent components
+    setProgress(70, "Loading sleep data for Deep Dive analysis…");
+    const sleepRecordsData = await fetchSleepRecords();
+
+    // Agent 1: Duration Analysis
+    setProgress(75, "Analyzing sleep duration patterns…");
+    try {
+      await renderSleepDuration(sleepRecordsData, "sleepDeepDiveDuration");
+    } catch (error) {
+      console.error("Duration Analysis error:", error);
+      const el = $("sleepDeepDiveDuration");
+      if (el) el.innerHTML = `<div class="notice">Duration analysis unavailable: ${error.message}</div>`;
+    }
+
+    // Agent 2: Timing Patterns
+    setProgress(80, "Analyzing sleep timing patterns…");
+    try {
+      await renderSleepTiming(sleepRecordsData, "sleepDeepDiveTiming");
+    } catch (error) {
+      console.error("Timing Patterns error:", error);
+      const el = $("sleepDeepDiveTiming");
+      if (el) el.innerHTML = `<div class="notice">Timing analysis unavailable: ${error.message}</div>`;
+    }
+
+    // Agent 3: Weekly Pattern Detection
+    setProgress(85, "Analyzing weekly patterns…");
     const sleepData = await fetchSleepData();
     await renderWeeklyPatterns(sleepData, "weeklyPatternChart");
 
