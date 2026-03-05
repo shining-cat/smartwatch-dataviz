@@ -1,0 +1,5 @@
+Baseline functionality verified on Wed Mar  5 14:11:00 CET 2026
+- ZIP upload: working
+- Timeline tab: working
+- Seasonality tab: working
+- Sleep tab: exists (basic version)
