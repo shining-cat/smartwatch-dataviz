@@ -140,6 +140,25 @@
               <label title="Pick which metric to visualize as a calendar heatmap and weekday averages.">Metric</label>
               <select id="seasonMetric"></select>
               <div class="muted" style="margin-top:6px">Calendar heatmap + weekday averages.</div>
+            </div>
+            <div style="flex:1; min-width: 260px;">
+              <label title="Showing many years makes each day too small. Pick a shorter window for readability.">Range</label>
+              <select id="seasonRange">
+                <option value="1y">Last 1 year</option>
+                <option value="2y" selected>Last 2 years</option>
+                <option value="all">All time</option>
+              </select>
+              <div class="muted" style="margin-top:6px">Tip: start with 2 years, then zoom out if needed.</div>
+            </div>
+            <div style="flex:1; min-width: 260px;">
+              <label>Options</label>
+              <div class="row" style="margin-top:10px">
+                <button id="renderSeasonBtn" class="primary">Render seasonality</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div id="controlsSleep" style="display:none">
           <div class="card" style="padding:12px">
             <div class="row" style="justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px">
@@ -159,25 +178,6 @@
             </div>
             <div class="muted" style="margin-top:6px">
               Master date range filters all charts and stats on this page. Change range and click Render to update.
-            </div>
-          </div>
-        </div>
-
-            </div>
-            <div style="flex:1; min-width: 260px;">
-              <label title="Showing many years makes each day too small. Pick a shorter window for readability.">Range</label>
-              <select id="seasonRange">
-                <option value="1y">Last 1 year</option>
-                <option value="2y" selected>Last 2 years</option>
-                <option value="all">All time</option>
-              </select>
-              <div class="muted" style="margin-top:6px">Tip: start with 2 years, then zoom out if needed.</div>
-            </div>
-            <div style="flex:1; min-width: 260px;">
-              <label>Options</label>
-              <div class="row" style="margin-top:10px">
-                <button id="renderSeasonBtn" class="primary">Render seasonality</button>
-              </div>
             </div>
           </div>
         </div>
