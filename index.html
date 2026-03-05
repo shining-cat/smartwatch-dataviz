@@ -1297,6 +1297,9 @@
           tooltip: {
             trigger: 'axis',
             axisPointer: { type: 'shadow' },
+            backgroundColor: '#121824',
+            borderColor: '#2a3a55',
+            textStyle: { color: '#e7eef7' },
             formatter: (params) => {
               const p = params[0];
               const percent = ((p.value / histogram.total) * 100).toFixed(1);
@@ -1313,12 +1316,12 @@
           xAxis: {
             type: 'category',
             data: histogram.bins,
-            axisLabel: { color: 'var(--muted)', fontSize: 11 },
+            axisLabel: { color: '#9fb0c3', fontSize: 11 },
             axisLine: { lineStyle: { color: '#2a3a55' } }
           },
           yAxis: {
             type: 'value',
-            axisLabel: { color: 'var(--muted)', fontSize: 11 },
+            axisLabel: { color: '#9fb0c3', fontSize: 11 },
             axisLine: { lineStyle: { color: '#2a3a55' } },
             splitLine: { lineStyle: { color: '#1f2a3a' } }
           },
