@@ -1,0 +1,13 @@
+# Health data - NEVER commit
+data/**/*
+!data/.gitkeep
+!data/*/.gitkeep
+
+# Backup/temp files
+*.bak
+*.tmp
+*~
+
+# OS files
+.DS_Store
+Thumbs.db

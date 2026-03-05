@@ -1,0 +1,1126 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Withings Local Viz</title>
+  <style>
+    :root { --bg:#0b0f14; --card:#121824; --muted:#9fb0c3; --fg:#e7eef7; --accent:#3aa0ff; --good:#3dce79; --warn:#ffbf3a; --bad:#ff5a6b; }
+    * { box-sizing: border-box; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; }
+    body { margin:0; background:var(--bg); color:var(--fg); }
+    header { padding:16px 18px; border-bottom:1px solid #1f2a3a; display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+    header h1 { font-size:16px; margin:0; font-weight:600; letter-spacing:.2px; }
+    header .pill { font-size:12px; padding:4px 8px; border:1px solid #223046; border-radius:999px; color:var(--muted); }
+    main { padding:16px 18px; max-width:1200px; margin:0 auto; }
+    .grid { display:grid; grid-template-columns: 360px 1fr; gap:14px; align-items:start; }
+    @media (max-width: 980px){ .grid{ grid-template-columns:1fr; } }
+    .card { background:var(--card); border:1px solid #1f2a3a; border-radius:12px; padding:12px; }
+    .card h2 { margin:0 0 10px 0; font-size:13px; color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:.8px; }
+    .drop { border:1px dashed #2a3a55; border-radius:12px; padding:14px; text-align:center; background:rgba(255,255,255,0.02); }
+    .drop.drag { border-color: var(--accent); background: rgba(58,160,255,0.08); }
+    .drop strong { display:block; margin-bottom:4px; }
+    .btnrow { display:flex; gap:10px; flex-wrap:wrap; margin-top:10px; }
+    button { background:#152033; border:1px solid #223046; color:var(--fg); padding:9px 10px; border-radius:10px; cursor:pointer; font-size:13px; }
+    button:hover { border-color:#2c4061; }
+    button.primary { background:linear-gradient(180deg, #1d4f9a, #163b73); border-color:#2b66b6; }
+    button.danger { border-color:#5b2a34; background:#241118; }
+    .muted { color:var(--muted); font-size:12px; line-height:1.35; }
+    .row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+    label { font-size:12px; color:var(--muted); }
+    select, input[type="checkbox"] { accent-color: var(--accent); }
+    select { width:100%; padding:9px 10px; border-radius:10px; background:#0f1521; border:1px solid #223046; color:var(--fg); }
+    .tabs { display:flex; gap:8px; margin-bottom:12px; }
+    .tab { padding:8px 10px; border-radius:10px; border:1px solid #223046; background:#0f1521; color:var(--muted); cursor:pointer; font-size:13px; }
+    .tab.active { color:var(--fg); border-color:#2b66b6; background:rgba(58,160,255,0.08); }
+    .chart { width:100%; height:600px; }
+    .chart.small { height:360px; }
+    .kpi { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:10px; }
+    .kpi .tile { background:#0f1521; border:1px solid #223046; border-radius:10px; padding:10px; }
+    .kpi .tile .v { font-size:18px; font-weight:700; margin-top:4px; }
+    .kpi .tile .k { font-size:12px; color:var(--muted); }
+    .progresswrap { margin-top:10px; }
+    .bar { height:10px; width:100%; background:#0f1521; border:1px solid #223046; border-radius:999px; overflow:hidden; }
+    .bar > div { height:100%; width:0%; background:linear-gradient(90deg, #3aa0ff, #3dce79); transition: width .2s; }
+    .log { margin-top:10px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+           font-size:11px; color:#b7c6d9; white-space:pre-wrap; background:#0f1521; border:1px solid #223046; border-radius:10px; padding:10px; max-height:210px; overflow:auto; }
+    .notice { padding:10px; border-radius:10px; background:rgba(255,191,58,0.10); border:1px solid rgba(255,191,58,0.25); color:#ffd68a; font-size:12px; }
+  
+    .insight-card{ background:#0f1521; border:1px solid #223046; padding:10px; border-radius:8px; min-width:170px; }
+
+#tabSleep{ display:inline-flex !important; }
+</style>
+</head>
+<body>
+  <header>
+    <h1>Withings Local Viz</h1>
+    <span class="pill">privacy-first • runs entirely in your browser</span>
+    <span class="pill" id="statusPill">no data loaded</span>
+  </header>
+
+  <main>
+    <div class="grid">
+      <div class="card">
+        <h2>Load data</h2>
+        <div id="drop" class="drop">
+          <strong>Drop your Withings export ZIP here</strong>
+          <div class="muted">or choose a file. Everything stays on this device.</div>
+          <div class="btnrow">
+            <input id="fileInput" type="file" accept=".zip" style="display:none" />
+            <button class="primary" id="chooseBtn">Choose ZIP</button>
+            <button id="reloadBtn" title="Re-render using stored IndexedDB data">Reload from storage</button>
+            <button id="debugRenderBtn" title="Debug: force a timeline render and write to log">Debug render</button>
+          </div>
+        </div>
+
+        <div class="progresswrap">
+          <div class="row" style="justify-content:space-between; margin-top:10px;">
+            <div class="muted" id="progressLabel">Waiting for a ZIP…</div>
+            <div class="muted" id="progressPct">0%</div>
+          </div>
+          <div class="muted" id="lastAction" style="margin-top:6px">Last action: —</div>
+          <div class="bar"><div id="barFill"></div></div>
+          <div class="log" id="log"></div>
+        </div>
+
+        <div class="kpi" id="kpis" style="display:none">
+          <div class="tile"><div class="k">Date range</div><div class="v" id="kpiRange">—</div></div>
+          <div class="tile"><div class="k">Days loaded</div><div class="v" id="kpiDays">—</div></div>
+          <div class="tile"><div class="k">Metrics available</div><div class="v" id="kpiMetrics">—</div></div>
+          <div class="tile"><div class="k">Storage</div><div class="v" id="kpiStorage">IndexedDB</div></div>
+        </div>
+
+        <div class="notice" style="margin-top:10px">
+          MVP reads: <b>aggregates_*.csv</b> (excluding calories/manual), <b>weight.csv</b>, <b>sleep.csv</b>.
+          Raw high-frequency streams are detected but skipped (for now) to keep first load fast.
+        </div>
+
+        <div class="btnrow" style="margin-top:10px">
+          <button id="exportBtn" title="Export your parsed daily dataset + overrides as JSON">Export patched dataset</button>
+          <button class="danger" id="wipeBtn">Wipe local storage</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="tabs">
+          <div class="tab active" id="tabTimeline">Timeline</div>
+          <div class="tab" id="tabSeasonality">Weekly seasonality</div>
+          <div class="tab" id="tabSleep">Sleep</div>
+        </div>
+
+        <div id="controlsTimeline" class="card" style="background:transparent; border:none; padding:0; margin-bottom:10px">
+          <div class="row" style="align-items:flex-start">
+            <div style="flex:1; min-width: 260px;">
+              <label title="Pick one or more metrics to plot over time. Ctrl/Cmd-click to select multiple.">Metrics (multi-select)</label>
+              <select id="metricSelect" multiple size="8"></select>
+              <div class="muted" style="margin-top:6px">Tip: Ctrl/Cmd-click to multi-select.</div>
+            </div>
+            <div style="flex:1; min-width: 260px;">
+              <label>Options</label>
+              <div class="row" style="margin-top:8px">
+                <input id="rolling7" type="checkbox" />
+                <label for="rolling7" title="Smooths day-to-day noise by averaging each day with the previous days (here: 7 days). Helps you see the overall trend.">7-day rolling average</label>
+              </div>
+              <div class="row" style="margin-top:8px">
+                <input id="normalize" type="checkbox" />
+                <label for="normalize" title="Puts each selected metric on the same relative scale (how far above/below its own average). Useful when comparing different units like steps vs kg.">Normalize (z-score) per metric</label>
+              </div>
+              <div class="row" style="margin-top:10px">
+                <button id="renderTimelineBtn" class="primary">Render timeline</button>
+              </div>
+              <div class="muted" style="margin-top:10px">
+                Timeline uses daily data (aggregates + derived daily sleep + daily weight).
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div id="controlsSeasonality" class="card" style="display:none; background:transparent; border:none; padding:0; margin-bottom:10px">
+          <div class="row" style="align-items:flex-start">
+            <div style="flex:1; min-width: 260px;">
+              <label title="Pick which metric to visualize as a calendar heatmap and weekday averages.">Metric</label>
+              <select id="seasonMetric"></select>
+              <div class="muted" style="margin-top:6px">Calendar heatmap + weekday averages.</div>
+        <div id="controlsSleep" style="display:none">
+          <div class="card" style="padding:12px">
+            <div class="row" style="justify-content:space-between; align-items:center">
+              <h2 style="margin:0">Sleep dashboard</h2>
+              <button id="renderSleepBtn" title="Render sleep charts">Render sleep</button>
+            </div>
+            <div class="muted" style="margin-top:6px">
+              Shows nightly duration + bedtime scatter (time-of-day). Metrics are derived from sleep.csv and assigned to the wake-up date.
+            </div>
+          </div>
+        </div>
+
+            </div>
+            <div style="flex:1; min-width: 260px;">
+              <label title="Showing many years makes each day too small. Pick a shorter window for readability.">Range</label>
+              <select id="seasonRange">
+                <option value="1y">Last 1 year</option>
+                <option value="2y" selected>Last 2 years</option>
+                <option value="all">All time</option>
+              </select>
+              <div class="muted" style="margin-top:6px">Tip: start with 2 years, then zoom out if needed.</div>
+            </div>
+            <div style="flex:1; min-width: 260px;">
+              <label>Options</label>
+              <div class="row" style="margin-top:10px">
+                <button id="renderSeasonBtn" class="primary">Render seasonality</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div id="chart" class="chart"></div>
+        <div id="chart2" class="chart small" style="margin-top:12px; display:none;"></div>
+
+      <div id="sleepCharts" style="display:none; margin-top:10px;">
+        <div class="card" style="margin-top:10px">
+          <h2 style="margin-bottom:6px">Sleep duration</h2>
+          <div id="sleepDurationChart" class="chart" style="height:260px"></div>
+          <div class="muted" style="margin-top:6px">Includes a 30-day rolling mean.</div>
+        </div>
+        <div class="card" style="margin-top:10px">
+          <h2 style="margin-bottom:6px">Bedtime scatter</h2>
+          <div id="sleepBedtimeChart" class="chart" style="height:420px"></div>
+          <div class="muted" style="margin-top:6px">Each dot is bedtime; vertical axis is time-of-day.</div>
+        </div>
+        <div class="card" style="margin-top:10px">
+          <h2 style="margin-bottom:6px">Sleep summary</h2>
+          <div id="sleepInsightCards" style="display:flex; gap:8px; flex-wrap:wrap;"></div>
+        </div>
+      </div>
+
+      </div>
+    </div>
+  </main>
+
+  <!-- Dependencies (CDN) -->
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dexie@3.2.5/dist/dexie.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
+
+  <script>
+  const $ = (id) => document.getElementById(id);
+  const logEl = $("log");
+  function log(msg){
+    try {
+      const t = new Date().toISOString().replace("T"," ").replace("Z","");
+      if (logEl) {
+        logEl.textContent += `[${t}] ${msg}
+`;
+        logEl.scrollTop = logEl.scrollHeight;
+      }
+      const la = $("lastAction");
+      if (la) la.textContent = "Last action: " + msg;
+    } catch (e){ /* ignore */ }
+  }
+  function setProgress(pct, label){
+    const p = Math.max(0, Math.min(100, pct|0));
+    $("barFill").style.width = p + "%";
+    $("progressPct").textContent = p + "%";
+    $("progressLabel").textContent = label;
+  }
+  function isoDateFromEpochMs(ms){
+    const d = new Date(ms);
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth()+1).padStart(2,"0");
+    const dd = String(d.getDate()).padStart(2,"0");
+    return `${yyyy}-${mm}-${dd}`;
+  }
+  function parseDateishToISO(s){
+    if (s == null) return null;
+    const str = String(s).trim();
+    if (!str) return null;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+    if (/^\d+$/.test(str)){
+      const n = Number(str);
+      if (!Number.isFinite(n)) return null;
+      const ms = n < 1e12 ? n*1000 : n;
+      return isoDateFromEpochMs(ms);
+    }
+    const dt = new Date(str);
+    if (!isNaN(dt.getTime())) return isoDateFromEpochMs(dt.getTime());
+    return null;
+  }
+  function toNumber(x){
+    if (x == null) return null;
+    const s = String(x).trim().replace(",", ".");
+    if (s === "" || s.toLowerCase() === "nan") return null;
+    const n = Number(s);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  // Capture unexpected errors and show them in the log (and an alert)
+  window.addEventListener("error", (event) => {
+    const msg = event && event.message ? event.message : "Unknown error";
+    log("JS error: " + msg);
+    try { alert("Error: " + msg + "\\n\\nSee the log panel for details."); } catch(e){}
+  });
+
+  window.addEventListener("unhandledrejection", (event) => {
+    const reason = event && event.reason ? (event.reason.message || String(event.reason)) : "Unknown promise rejection";
+    log("Unhandled rejection: " + reason);
+    try { alert("Error: " + reason + "\\n\\nSee the log panel for details."); } catch(e){}
+  });
+
+
+  // IndexedDB
+  const db = new Dexie("withingsLocalViz");
+  db.version(1).stores({
+    daily: "[metric+date], metric, date",
+    meta: "key"
+  });
+  // v2 adds local override edits (metric+date → value)
+  db.version(2).stores({
+    daily: "[metric+date], metric, date",
+    meta: "key",
+    overrides: "[metric+date], metric, date"
+  });
+
+  async function wipeStorage(){
+    await db.daily.clear();
+    await db.meta.clear();
+    if (db.overrides) await db.overrides.clear();
+    setStatus("no data loaded");
+    $("kpis").style.display = "none";
+    $("metricSelect").innerHTML = "";
+    $("seasonMetric").innerHTML = "";
+    log("Wiped IndexedDB storage.");
+  }
+
+  // Ingestion filters
+  // We only ingest "daily-ish" CSVs for the MVP. We also skip:
+  // - anything with "calories" (you don't care about those)
+  // - anything labeled "manual" (too irregular)
+  const DAILY_FILES_ALLOW = [/^aggregates_.*\.csv$/i, /^weight\.csv$/i, /^sleep\.csv$/i];
+
+  function isAllowedDailyFile(name){
+    const base = name.split("/").pop();
+    if (!DAILY_FILES_ALLOW.some(rx => rx.test(base))) return false;
+    const b = base.toLowerCase();
+    if (b.includes("calories")) return false;
+    if (b.includes("manual")) return false;
+    return true;
+  }
+
+  function metricFromFilename(base){
+    const b = base.toLowerCase();
+    if (b.startsWith("aggregates_")) return base.replace(/\.csv$/i,"");
+    if (b === "weight.csv") return "weight";
+    if (b === "sleep.csv") return "sleep_duration_min";
+    return base.replace(/\.csv$/i,"");
+  }
+
+  async function ingestZip(file){
+    logEl.textContent = "";
+    setProgress(1, "Reading ZIP…");
+    log(`Opening ZIP: ${file.name}`);
+    const zip = await JSZip.loadAsync(file);
+
+    const allFiles = Object.keys(zip.files).filter(n => !zip.files[n].dir);
+    log(`ZIP contains ${allFiles.length} files.`);
+    const dailyFiles = allFiles.filter(isAllowedDailyFile);
+    const skipped = allFiles.length - dailyFiles.length;
+    if (skipped > 0) log(`Skipping ${skipped} files (raw streams etc.) for MVP speed.`);
+    if (dailyFiles.length === 0){
+      log("No supported files found. Expected aggregates_*.csv, weight.csv, sleep.csv");
+      setProgress(0, "No supported files found in ZIP.");
+      return;
+    }
+
+    await db.daily.clear();
+    await db.meta.put({ key:"sourceZipName", value:file.name });
+    await db.meta.put({ key:"ingestedAt", value: Date.now() });
+
+    let i = 0;
+    for (const name of dailyFiles){
+      i++;
+      const base = name.split("/").pop();
+      const metric = metricFromFilename(base);
+      setProgress(Math.round((i-1)/dailyFiles.length*100), `Parsing ${i}/${dailyFiles.length}: ${base}`);
+      log(`Parsing ${base} → metric "${metric}"`);
+      const text = await zip.files[name].async("string");
+      await parseAndStoreDailyCSV(base, metric, text);
+      setProgress(Math.round((i)/dailyFiles.length*100), `Parsed ${i}/${dailyFiles.length}: ${base}`);
+    }
+
+    await computeAndStoreMeta();
+    setProgress(100, "Done. Rendering default views…");
+    log("Ingestion complete.");
+    try {
+      const metrics = await db.daily.orderBy("metric").uniqueKeys();
+      const hasSleep = metrics && metrics.some(k => (""+k).startsWith("sleep_"));
+      if (hasSleep) { log("Auto-opening Sleep tab."); setTab("sleep"); }
+    } catch(e){ console.error(e); }
+    await refreshMetricPickersFromDB();
+    await renderDefault();
+  }
+
+  async function parseAndStoreDailyCSV(filename, metric, csvText){
+    const rowsBuffer = [];
+    const BATCH = 2000;
+    const lower = filename.toLowerCase();
+
+    function flush(){
+      if (rowsBuffer.length === 0) return Promise.resolve();
+      const chunk = rowsBuffer.splice(0, rowsBuffer.length);
+      return db.daily.bulkPut(chunk);
+    }
+
+    return new Promise((resolve, reject) => {
+      Papa.parse(csvText, {
+        header: true,
+        skipEmptyLines: true,
+        dynamicTyping: false,
+        worker: true,
+        step: (results) => {
+          const r = results.data || {};
+          const dateCandidates = [r.date, r.day, r.datetime, r.timestamp, r.measure_date, r.startdate, r.start_date, r.enddate, r.end_date, r.from, r.to].filter(v => v != null);
+          let iso = null;
+          for (const c of dateCandidates){
+            iso = parseDateishToISO(c);
+            if (iso) break;
+          }
+          if (!iso){
+            for (const k of Object.keys(r)){
+              if (/date|time/i.test(k)){
+                const maybe = parseDateishToISO(r[k]);
+                if (maybe){ iso = maybe; break; }
+              }
+            }
+          }
+          if (!iso) return;
+
+          let value = null;
+
+          if (lower === "sleep.csv"){
+            // Withings sleep.csv columns are typically:
+            // from,to,"light (s)","deep (s)","rem (s)","awake (s)",...
+            // We derive a daily sleep duration in minutes using (to - from).
+            const fromRaw = r.from ?? r["from"];
+            const toRaw = r.to ?? r["to"];
+            const fromDt = fromRaw ? new Date(String(fromRaw)) : null;
+            const toDt = toRaw ? new Date(String(toRaw)) : null;
+
+            if (fromDt && toDt && !isNaN(fromDt.getTime()) && !isNaN(toDt.getTime())){
+              value = Math.max(0, (toDt.getTime() - fromDt.getTime())/60000);
+              // For daily grouping, we assign the sleep to the wake-up day (the "to" date)
+              iso = isoDateFromEpochMs(toDt.getTime());
+            
+              try {
+                const bdMin = fromDt.getHours()*60 + fromDt.getMinutes();
+                const wdMin = toDt.getHours()*60 + toDt.getMinutes();
+                rowsBuffer.push({ metric: "sleep_bedtime_min", date: iso, value: bdMin });
+                rowsBuffer.push({ metric: "sleep_wake_min", date: iso, value: wdMin });
+              } catch(e){}
+} else {
+              // Fallback: try to sum stage seconds if present
+              const stageKeys = ['light (s)', 'deep (s)', 'rem (s)'];
+              let sumSec = 0;
+              let any = false;
+              for (const k of stageKeys){
+                if (r[k] != null){
+                  const n = toNumber(r[k]);
+                  if (n != null){ sumSec += n; any = true; }
+                }
+              }
+              if (any){
+                value = sumSec / 60;
+              }
+            }
+            if (value == null) return;
+          } else if (lower === "weight.csv"){
+            const weightKeys = ["weight","kg","value","measure","weight_kg"];
+            for (const k of weightKeys){
+              if (r[k] != null){
+                value = toNumber(r[k]);
+                if (value != null) break;
+              }
+            }
+            if (value == null){
+              for (const k of Object.keys(r)){
+                const n = toNumber(r[k]);
+                if (n != null){ value = n; break; }
+              }
+            }
+            if (value == null) return;
+          } else {
+            const ignore = new Set(["date","day","datetime","timestamp","measure_date","startdate","start_date","enddate","end_date"]);
+            for (const k of Object.keys(r)){
+              if (ignore.has(String(k).toLowerCase())) continue;
+              const n = toNumber(r[k]);
+              if (n != null){ value = n; break; }
+            }
+            if (value == null) return;
+          }
+
+          rowsBuffer.push({ metric, date: iso, value });
+          if (rowsBuffer.length >= BATCH){
+            const chunk = rowsBuffer.splice(0, rowsBuffer.length);
+            db.daily.bulkPut(chunk).catch(console.error);
+          }
+        },
+        complete: async () => { await flush(); resolve(); },
+        error: (err) => reject(err)
+      });
+    });
+  }
+
+  async function computeAndStoreMeta(){
+    const all = await db.daily.toArray();
+    if (!all.length) return;
+    const dates = all.map(x => x.date).sort();
+    const metrics = [...new Set(all.map(x => x.metric))].sort();
+    await db.meta.put({ key:"dateMin", value: dates[0] });
+    await db.meta.put({ key:"dateMax", value: dates[dates.length-1] });
+    await db.meta.put({ key:"metrics", value: metrics });
+    await db.meta.put({ key:"days", value: [...new Set(dates)].length });
+
+    $("kpis").style.display = "";
+    $("kpiRange").textContent = `${dates[0]} → ${dates[dates.length-1]}`;
+    $("kpiDays").textContent = String([...new Set(dates)].length);
+    $("kpiMetrics").textContent = String(metrics.length);
+    setStatus("data loaded");
+  }
+
+  function setStatus(text){ $("statusPill").textContent = text; }
+
+  async function refreshMetricPickersFromDB(){
+    const m = await db.meta.get("metrics");
+    let metrics = (m && m.value) ? m.value : [];
+    metrics = metrics.filter(x => !String(x).toLowerCase().includes("calories") && !String(x).toLowerCase().includes("manual"));
+    const sel = $("metricSelect");
+    const sel2 = $("seasonMetric");
+    sel.innerHTML = "";
+    sel2.innerHTML = "";
+    for (const metric of metrics){
+      const opt = document.createElement("option");
+      opt.value = metric; opt.textContent = metric;
+      sel.appendChild(opt);
+
+      const opt2 = document.createElement("option");
+      opt2.value = metric; opt2.textContent = metric;
+      sel2.appendChild(opt2);
+    }
+    const defaults = ["aggregates_steps","sleep_duration_min","weight"];
+    for (let i=0;i<sel.options.length;i++){
+      if (defaults.includes(sel.options[i].value)) sel.options[i].selected = true;
+    }
+    if (sel2.options.length){
+      sel2.value = defaults.find(d => metrics.includes(d)) || sel2.options[0].value;
+    }
+  }
+
+  // Charts
+  let chart = null, chart2 = null;
+  let currentTimelineSeries = null;
+  function ensureCharts(){
+    if (!chart){
+      chart = echarts.init($("chart"), null, { renderer:"canvas" });
+      window.addEventListener("resize", () => chart.resize());
+    }
+    // chart2 is initialized lazily when it becomes visible (avoids 0-width init)
+    if (!chart2){
+      const el = $("chart2");
+      const visible = el && el.style.display !== "none";
+      if (visible){
+        chart2 = echarts.init(el, null, { renderer:"canvas" });
+        window.addEventListener("resize", () => chart2.resize());
+      }
+    }
+  }
+
+  async function renderDefault(){ await renderTimeline(); }
+
+  function rollingAverage(values, window=7){
+    const out = []; let sum=0; const q=[];
+    for (let i=0;i<values.length;i++){
+      const v = values[i]; q.push(v); sum += v;
+      if (q.length > window) sum -= q.shift();
+      out.push(sum / q.length);
+    }
+    return out;
+  }
+  function zNormalize(values){
+    const n = values.length;
+    const mean = values.reduce((a,b)=>a+b,0)/n;
+    const varr = values.reduce((a,b)=>a+(b-mean)*(b-mean),0)/n;
+    const sd = Math.sqrt(varr) || 1;
+    return values.map(v => (v-mean)/sd);
+  }
+
+  async function fetchDailySeries(metric){
+    const rows = await db.daily.where("metric").equals(metric).sortBy("date");
+
+    // Aggregate multiple entries per day as average
+    const map = new Map();
+    for (const r of rows){
+      const prev = map.get(r.date);
+      if (!prev) map.set(r.date, { sum:r.value, n:1 });
+      else { prev.sum += r.value; prev.n += 1; }
+    }
+
+    const dates = [...map.keys()].sort();
+    let values = dates.map(d => map.get(d).sum / map.get(d).n);
+
+    // Apply overrides (if any) for this metric+date
+    let overridden = new Set();
+    if (db.overrides){
+      const ovs = await db.overrides.where("metric").equals(metric).toArray();
+      const ovMap = new Map(ovs.map(o => [o.date, o.value]));
+      for (let i=0;i<dates.length;i++){
+        if (ovMap.has(dates[i])){
+          values[i] = ovMap.get(dates[i]);
+          overridden.add(dates[i]);
+        }
+      }
+    }
+
+    return { dates, values, overridden };
+  }
+
+  async function renderTimeline(){
+    ensureCharts();
+    $("chart2").style.display = "none";
+
+    const metrics = [...$("metricSelect").selectedOptions].map(o => o.value);
+    if (!metrics.length){
+      chart.clear();
+      currentTimelineSeries = { metrics, series };
+
+    chart.setOption({ title:{ text:"Select at least one metric", left:"center", textStyle:{ color:"#e7eef7" } } });
+      return;
+    }
+
+    const useRoll = $("rolling7").checked;
+    const useNorm = $("normalize").checked;
+
+    setProgress(100, "Rendering timeline…");
+    log(`Rendering timeline for ${metrics.join(", ")}`);
+
+    const series = [];
+    for (const metric of metrics){
+      const { dates, values, overridden } = await fetchDailySeries(metric);
+      let vals = values.slice();
+      if (useRoll) vals = rollingAverage(vals, 7);
+      if (useNorm && vals.length >= 2) vals = zNormalize(vals);
+      const data = dates.map((d,i)=>[d, vals[i]]);
+      series.push({ name: metric, type:"line", showSymbol:false, sampling:"lttb", data });
+      // Render overrides as visible points
+      if (overridden && overridden.size){
+        const od = data.filter(p => overridden.has(p[0]));
+        series.push({ name: metric + " (edited)", type:"scatter", data: od, symbolSize: 9 });
+      }
+    }
+
+    chart.setOption({
+      backgroundColor:"transparent",
+      tooltip:{ trigger:"axis" },
+      legend:{ type:"scroll", top:0, textStyle:{ color:"#9fb0c3" } },
+      grid:{ left:50, right:20, top:35, bottom:55 },
+      xAxis:{ type:"time", axisLabel:{ color:"#9fb0c3" }, axisLine:{ lineStyle:{ color:"#223046" } } },
+      yAxis:{ type:"value", axisLabel:{ color:"#9fb0c3" }, splitLine:{ lineStyle:{ color:"#1f2a3a" } } },
+      dataZoom:[
+        { type:"inside", xAxisIndex:0 },
+        { type:"slider", xAxisIndex:0, bottom:10, height:25, borderColor:"#223046", textStyle:{ color:"#9fb0c3" } }
+      ],
+      series
+    }, true);
+  }
+
+  async function renderSeasonality(){
+    ensureCharts();
+    $("chart2").style.display = "";
+    const metric = $("seasonMetric").value;
+    if (!metric){ chart.clear(); chart2.clear(); return; }
+
+    setProgress(100, "Rendering seasonality…");
+    log(`Rendering weekly seasonality for ${metric}`);
+
+    const { dates, values, overridden } = await fetchDailySeries(metric);
+    if (!dates.length){ chart.clear(); chart2.clear(); return; }
+
+    // Choose a readable window (many years makes each cell tiny)
+    const rangeMode = ($("seasonRange") && $("seasonRange").value) ? $("seasonRange").value : "2y";
+    const end = dates[dates.length - 1];
+    let start = dates[0];
+
+    function addDays(iso, delta){
+      const d = new Date(iso + "T00:00:00");
+      d.setDate(d.getDate() + delta);
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth()+1).padStart(2,"0");
+      const dd = String(d.getDate()).padStart(2,"0");
+      return `${yyyy}-${mm}-${dd}`;
+    }
+    function daysBetween(a,b){
+      const da = new Date(a+"T00:00:00");
+      const db = new Date(b+"T00:00:00");
+      return Math.max(1, Math.round((db-da)/86400000));
+    }
+
+    if (rangeMode === "1y") start = addDays(end, -365);
+    else if (rangeMode === "2y") start = addDays(end, -730);
+
+    // Filter to selected date window
+    const calData = [];
+    const wdBuckets = Array.from({length:7}, ()=>({sum:0,n:0}));
+    for (let i=0;i<dates.length;i++){
+      const d = dates[i];
+      if (d < start || d > end) continue;
+      const v = values[i];
+      calData.push([d, v]);
+
+      const dt = new Date(d + "T00:00:00");
+      const wd = (dt.getDay() + 6) % 7; // Mon..Sun
+      wdBuckets[wd].sum += v;
+      wdBuckets[wd].n += 1;
+    }
+
+    if (!calData.length){
+      chart.clear(); chart2.clear();
+      return;
+    }
+
+    const wdNames = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+    const wdVals = wdBuckets.map(x=> x.n ? x.sum/x.n : 0);
+
+    const valsInRange = calData.map(x=>x[1]);
+    const min = Math.min(...valsInRange), max = Math.max(...valsInRange);
+
+    // Dynamic cell size so the calendar isn't a thin stripe.
+    // Approx weeks in range → choose a cell width that fits chart width.
+    const totalDays = daysBetween(start, end);
+    const weeks = Math.ceil(totalDays / 7);
+    const w = chart.getWidth ? chart.getWidth() : 900;
+    const usableW = Math.max(300, w - 110);
+    const cell = Math.max(10, Math.min(20, Math.floor(usableW / weeks)));
+
+    chart.setOption({
+      tooltip:{ position:"top" },
+      visualMap:{
+        min, max, calculable:true,
+        orient:"horizontal",
+        left:"center", bottom: 8,
+        textStyle:{ color:"#9fb0c3" }
+      },
+      title:{ text:`Calendar heatmap: ${metric}`, left:"center", top:6, textStyle:{ color:"#e7eef7", fontSize:14 } },
+      calendar:{
+        top: 50, left: 30, right: 20, bottom: 55,
+        cellSize:[cell, cell],
+        range:[start, end],
+        itemStyle:{ borderWidth:0.5, borderColor:"#1f2a3a" },
+        yearLabel:{ color:"#9fb0c3" },
+        monthLabel:{ color:"#9fb0c3" },
+        dayLabel:{ color:"#9fb0c3" }
+      },
+      series:[{ type:"heatmap", coordinateSystem:"calendar", data: calData }]
+    }, true);
+
+    chart2.setOption({
+      title:{ text:`Weekday averages: ${metric}`, left:"center", top:8, textStyle:{ color:"#e7eef7", fontSize:14 } },
+      grid:{ left:55, right:20, top:45, bottom:45 },
+      tooltip:{ trigger:"axis" },
+      xAxis:{ type:"category", data: wdNames, axisLabel:{ color:"#9fb0c3" }, axisLine:{ lineStyle:{ color:"#223046" } } },
+      yAxis:{ type:"value", axisLabel:{ color:"#9fb0c3" }, splitLine:{ lineStyle:{ color:"#1f2a3a" } } },
+      series:[{ type:"bar", data: wdVals }]
+    }, true);
+  }
+
+  // --------------------------
+  // Editing (overrides)
+  // --------------------------
+  let editState = null; // { metric, dateISO, currentValue }
+
+  async function getOverride(metric, dateISO){
+    if (!db.overrides) return null;
+    const row = await db.overrides.get([metric, dateISO]);
+    return row ? row.value : null;
+  }
+
+  async function setOverride(metric, dateISO, value){
+    if (!db.overrides) return;
+    if (value == null){
+      await db.overrides.delete([metric, dateISO]);
+    } else {
+      await db.overrides.put({ metric, date: dateISO, value: Number(value) });
+    }
+  }
+
+  async function openEditModal(metric, dateISO, currentValue){
+    // Ensure modal handlers are bound even if the modal HTML is below the main script
+    bindModalHandlers();
+    const ov = await getOverride(metric, dateISO);
+    editState = { metric, dateISO, currentValue };
+
+    $("editTitle").textContent = metric;
+    $("editSubtitle").textContent = dateISO;
+    $("editCurrent").textContent = (currentValue != null) ? String(currentValue) : "—";
+    $("editNewValue").value = (ov != null) ? String(ov) : "";
+    $("editModal").style.display = "flex";
+    $("editNewValue").focus();
+    $("editNewValue").select();
+  }
+
+  function closeEditModal(){
+    $("editModal").style.display = "none";
+    editState = null;
+  }
+
+  async function saveEditModal(){
+    if (!editState) return;
+    const state = { ...editState }; // capture before any UI changes
+    try {
+      const raw = $("editNewValue").value;
+      const v = raw === "" ? null : Number(raw);
+      if (raw !== "" && !Number.isFinite(v)){
+        alert("Please enter a valid number (or leave blank to remove the override).");
+        return;
+      }
+
+      setProgress(100, "Saving edit…");
+      await setOverride(state.metric, state.dateISO, v);
+      closeEditModal();
+
+      // Re-render timeline (this is the heaviest step)
+      setProgress(100, "Re-rendering timeline…");
+      await renderTimeline();
+
+      log(`Saved override: ${state.metric} @ ${state.dateISO} = ${raw === "" ? "removed" : v}`);
+      setProgress(100, "Ready.");
+    } catch (e){
+      console.error(e);
+      log("Error while saving override: " + (e && e.message ? e.message : String(e)));
+      alert("Something went wrong while saving that edit. Please check the log panel.");
+      setProgress(100, "Error while saving.");
+    }
+  }
+
+  async function resetEditModal(){
+    if (!editState) return;
+    const state = { ...editState };
+    try {
+      setProgress(100, "Removing override…");
+      await setOverride(state.metric, state.dateISO, null);
+      $("editNewValue").value = "";
+      await renderTimeline();
+      log(`Removed override: ${state.metric} @ ${state.dateISO}`);
+      setProgress(100, "Ready.");
+    } catch (e){
+      console.error(e);
+      log("Error while removing override: " + (e && e.message ? e.message : String(e)));
+      alert("Something went wrong while removing that edit. Please check the log panel.");
+      setProgress(100, "Error while removing.");
+    }
+  }
+
+  async function exportPatchedDataset(){
+    const daily = await db.daily.toArray();
+    const overrides = db.overrides ? await db.overrides.toArray() : [];
+    const meta = await db.meta.toArray();
+    const payload = { exportedAt: new Date().toISOString(), daily, overrides, meta };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type:"application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "withings_patched_dataset.json";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    log("Exported patched dataset as JSON.");
+  }
+
+
+  // Bind modal button handlers (modal HTML may appear after the main script in this single-file build)
+  function bindModalHandlers(){
+    try {
+      const modal = $("editModal");
+      if (!modal) return false;
+
+      if (modal.__bound) return true;
+      modal.__bound = true;
+
+      const closeBtn = $("editCloseBtn");
+      const saveBtn = $("editSaveBtn");
+      const resetBtn = $("editResetBtn");
+      const exportBtn = $("exportBtn");
+      const input = $("editNewValue");
+
+      if (exportBtn){
+        exportBtn.addEventListener("click", ()=>{ log("Clicked: Export patched dataset"); exportPatchedDataset().catch(console.error); });
+      }
+
+      if (closeBtn){
+        closeBtn.addEventListener("click", ()=>{ log("Clicked: Close modal"); closeEditModal(); });
+      }
+      if (saveBtn){
+        saveBtn.addEventListener("click", ()=>{ log("Clicked: Save edit"); saveEditModal().catch(console.error); });
+      }
+      if (resetBtn){
+        resetBtn.addEventListener("click", ()=>{ log("Clicked: Remove override"); resetEditModal().catch(console.error); });
+      }
+      if (modal){
+        modal.addEventListener("click", (e)=>{ if (e.target && e.target.id === "editModal") { log("Clicked: Modal backdrop"); closeEditModal(); } });
+      }
+      if (input){
+        input.addEventListener("keydown", (e)=>{ if (e.key === "Enter") { e.preventDefault(); log("Pressed Enter: Save edit"); saveEditModal().catch(console.error); } });
+      }
+
+      return true;
+    } catch(e){
+      console.error(e);
+      return false;
+    }
+  }
+
+  // --------------------------
+  // Sleep Dashboard (v1)
+  // --------------------------
+  function fmtHoursMins(totalMins){
+    if (totalMins == null || !Number.isFinite(totalMins)) return "—";
+    const h = Math.floor(totalMins/60);
+    const m = Math.round(totalMins%60);
+    return `${h}h ${String(m).padStart(2,"0")}m`;
+  }
+  function mean(arr){
+    if (!arr || !arr.length) return null;
+    return arr.reduce((a,b)=>a+b,0)/arr.length;
+  }
+  function std(arr){
+    if (!arr || !arr.length) return null;
+    const m = mean(arr);
+    return Math.sqrt(arr.reduce((a,b)=>a+(b-m)*(b-m),0)/arr.length);
+  }
+
+  async function computeSleepInsights(){
+    const dur = await fetchDailySeries("sleep_duration_min");
+    const bd = await fetchDailySeries("sleep_bedtime_min");
+
+    const last30Dur = dur.values.slice(Math.max(0, dur.values.length-30));
+    const avg30 = mean(last30Dur);
+    const overallAvg = mean(dur.values);
+    const pctBelow6 = last30Dur.length ? (last30Dur.filter(v=>v<360).length / last30Dur.length) : 0;
+
+    const last30Bed = bd.values.slice(Math.max(0, bd.values.length-30));
+    const bedtimeStd = std(last30Bed);
+
+    return { dur, bd, avg30, overallAvg, pctBelow6, bedtimeStd };
+  }
+
+  async function renderSleepDashboard(){
+    setProgress(20, "Rendering sleep dashboard…");
+    const ins = await computeSleepInsights();
+
+    // cards
+    const cardsEl = $("sleepInsightCards");
+    if (cardsEl){
+      cardsEl.innerHTML = "";
+      const mk = (title, main, sub) => {
+        const d = document.createElement("div");
+        d.className="insight-card";
+        d.innerHTML = `<div style="font-size:12px;color:#9fb0c3;">${title}</div>
+                       <div style="font-size:18px;font-weight:700;margin-top:6px">${main}</div>
+                       <div class="muted" style="margin-top:6px">${sub}</div>`;
+        return d;
+      };
+      cardsEl.appendChild(mk("Last 30d avg", fmtHoursMins(ins.avg30), "Average nightly sleep"));
+      cardsEl.appendChild(mk("Overall avg", fmtHoursMins(ins.overallAvg), "Since first recorded night"));
+      cardsEl.appendChild(mk("Nights < 6h (30d)", `${Math.round(ins.pctBelow6*100)}%`, "Percent nights under 6 hours"));
+      cardsEl.appendChild(mk("Bedtime variability (30d)", ins.bedtimeStd!=null ? `${Math.round(ins.bedtimeStd)} min` : "—", "How much bedtime varies"));
+    }
+
+    // duration chart
+    const durEl = $("sleepDurationChart");
+    if (!window.sleepDurChart && durEl){
+      window.sleepDurChart = echarts.init(durEl, null, { renderer:"canvas" });
+      window.addEventListener("resize", ()=>{ try{ window.sleepDurChart.resize(); }catch(e){} });
+    }
+    const dDates = ins.dur.dates;
+    const dVals = ins.dur.values;
+    const durSeries = dDates.map((d,i)=>[d, dVals[i]]);
+    const rolling = [];
+    for (let i=0;i<dVals.length;i++){
+      const w = dVals.slice(Math.max(0,i-29), i+1);
+      rolling.push([dDates[i], mean(w)]);
+    }
+    if (window.sleepDurChart){
+      window.sleepDurChart.setOption({
+        tooltip:{ trigger:"axis", formatter: (params)=> {
+          const p=params[0]; const v=p?.data?.[1];
+          return `${p.axisValue}<br/>${v!=null?fmtHoursMins(v):"—"}`;
+        }},
+        xAxis:{ type:"time", axisLabel:{ color:"#9fb0c3" } },
+        yAxis:{ type:"value", axisLabel:{ color:"#9fb0c3", formatter:(v)=>`${Math.round(v/60)}h` } },
+        series:[
+          { name:"Sleep", type:"bar", data: durSeries, barMaxWidth:12 },
+          { name:"30d mean", type:"line", showSymbol:false, smooth:true, data: rolling }
+        ]
+      }, true);
+    }
+
+    // bedtime scatter
+    const bedEl = $("sleepBedtimeChart");
+    if (!window.sleepBedChart && bedEl){
+      window.sleepBedChart = echarts.init(bedEl, null, { renderer:"canvas" });
+      window.addEventListener("resize", ()=>{ try{ window.sleepBedChart.resize(); }catch(e){} });
+    }
+    const bDates = ins.bd.dates;
+    const bVals = ins.bd.values;
+    const pts = bDates.map((d,i)=>[d, bVals[i]/60]); // hours
+    if (window.sleepBedChart){
+      window.sleepBedChart.setOption({
+        tooltip:{ formatter:(p)=>{
+          const d=p.data[0]; const v=p.data[1];
+          const hh=Math.floor(v); const mm=Math.round((v%1)*60);
+          return `${d}<br/>Bedtime: ${String(hh).padStart(2,"0")}:${String(mm).padStart(2,"0")}`;
+        }},
+        xAxis:{ type:"time", axisLabel:{ color:"#9fb0c3" } },
+        yAxis:{ type:"value", min:0, max:24,
+               axisLabel:{ color:"#9fb0c3", formatter:(v)=>{ const hh=Math.floor(v); const mm=Math.round((v%1)*60); return `${String(hh).padStart(2,"0")}:${String(mm).padStart(2,"0")}`; } } },
+        series:[ { name:"Bedtime", type:"scatter", data: pts, symbolSize:6 } ]
+      }, true);
+    }
+
+    // ensure charts sized
+    setTimeout(()=>{ try{ window.sleepDurChart?.resize(); window.sleepBedChart?.resize(); }catch(e){} }, 0);
+    setProgress(100, "Sleep dashboard ready");
+  }
+
+  // Tabs
+  function setTab(tab){
+    const isTimeline = tab === "timeline";
+    const isSeasonality = tab === "seasonality";
+    const isSleep = tab === "sleep";
+
+    $("tabTimeline").classList.toggle("active", isTimeline);
+    $("tabSeasonality").classList.toggle("active", isSeasonality);
+    if ($("tabSleep")) $("tabSleep").classList.toggle("active", isSleep);
+
+    $("controlsTimeline").style.display = isTimeline ? "" : "none";
+    $("controlsSeasonality").style.display = isSeasonality ? "" : "none";
+    if ($("controlsSleep")) $("controlsSleep").style.display = isSleep ? "" : "none";
+
+    // main charts vs sleep charts
+    if ($("sleepCharts")) $("sleepCharts").style.display = isSleep ? "" : "none";
+
+    if (isTimeline){
+      $("chart").style.display = "";
+      $("chart2").style.display = "none";
+      renderTimeline().catch(console.error);
+    } else if (isSeasonality){
+      $("chart").style.display = "";
+      renderSeasonality().catch(console.error);
+      setTimeout(()=>{ try { if (chart) chart.resize(); if (chart2) chart2.resize(); } catch(e){} }, 0);
+    } else if (isSleep){
+      $("chart").style.display = "none";
+      $("chart2").style.display = "none";
+      renderSleepDashboard().catch(console.error);
+    }
+  }
+  $("tabTimeline").addEventListener("click", ()=>setTab("timeline"));
+  $("tabSeasonality").addEventListener("click", ()=>setTab("seasonality"));
+  if ($("tabSleep")) $("tabSleep").addEventListener("click", ()=>setTab("sleep"));
+  if ($("renderSleepBtn")) $("renderSleepBtn").addEventListener("click", ()=>renderSleepDashboard().catch(console.error));
+  $("renderTimelineBtn").addEventListener("click", ()=>renderTimeline().catch(console.error));
+  $("renderSeasonBtn").addEventListener("click", ()=>renderSeasonality().catch(console.error));
+  $("wipeBtn").addEventListener("click", ()=>wipeStorage().catch(console.error));
+
+  // File input
+  $("chooseBtn").addEventListener("click", ()=>$("fileInput").click());
+  $("fileInput").addEventListener("change", (e)=>{
+    const f = e.target.files && e.target.files[0];
+    if (f) ingestZip(f).catch(err=>{ console.error(err); log("Error: " + err.message); });
+  });
+
+  $("debugRenderBtn").addEventListener("click", async ()=>{ log("Clicked: Debug render"); try { await renderTimeline(); log("Debug render done."); } catch(e){ console.error(e); log("Debug render error: " + (e.message||String(e))); } });
+
+  $("reloadBtn").addEventListener("click", async ()=>{
+    logEl.textContent = "";
+    log("Reloading from IndexedDB…");
+    setProgress(100, "Reloading from storage…");
+    await refreshMetricPickersFromDB();
+    const m = await db.meta.get("dateMin");
+    if (m && m.value){
+      $("kpis").style.display = "";
+      $("kpiRange").textContent = `${(await db.meta.get("dateMin")).value} → ${(await db.meta.get("dateMax")).value}`;
+      $("kpiDays").textContent = String((await db.meta.get("days")).value ?? "—");
+      const metrics = (await db.meta.get("metrics")).value ?? [];
+      $("kpiMetrics").textContent = String(metrics.length);
+      setStatus("data loaded");
+      await renderDefault();
+      log("Reload complete.");
+    } else {
+      setStatus("no data loaded");
+      log("No stored data found.");
+    }
+  });
+
+  // Drag/drop
+  const drop = $("drop");
+  ["dragenter","dragover"].forEach(ev => drop.addEventListener(ev, (e)=>{ e.preventDefault(); e.stopPropagation(); drop.classList.add("drag"); }));
+  ["dragleave","drop"].forEach(ev => drop.addEventListener(ev, (e)=>{ e.preventDefault(); e.stopPropagation(); drop.classList.remove("drag"); }));
+  drop.addEventListener("drop", (e)=>{
+    const f = e.dataTransfer.files && e.dataTransfer.files[0];
+    if (f) ingestZip(f).catch(err=>{ console.error(err); log("Error: " + err.message); });
+  });
+
+  // Boot auto-reload
+  (async function boot(){
+    bindModalHandlers();
+    log("App ready. Load a ZIP, or click “Reload from storage”.");
+    const m = await db.meta.get("dateMin");
+    if (m && m.value){
+      await refreshMetricPickersFromDB();
+      $("kpis").style.display = "";
+      $("kpiRange").textContent = `${(await db.meta.get("dateMin")).value} → ${(await db.meta.get("dateMax")).value}`;
+      $("kpiDays").textContent = String((await db.meta.get("days")).value ?? "—");
+      const metrics = (await db.meta.get("metrics")).value ?? [];
+      $("kpiMetrics").textContent = String(metrics.length);
+      setStatus("data loaded");
+      await renderDefault();
+      log("Auto-loaded stored data.");
+    }
+  })();
+  </script>
+
+  <!-- Edit modal -->
+  <div id="editModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:9999; align-items:center; justify-content:center; padding:18px;">
+    <div style="width:min(520px, 95vw); background:#121824; border:1px solid #223046; border-radius:12px; padding:14px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
+        <div>
+          <div style="font-size:13px; color:#9fb0c3; text-transform:uppercase; letter-spacing:.8px; font-weight:600;">Edit data point</div>
+          <div style="margin-top:6px; font-size:14px; font-weight:700;" id="editTitle">—</div>
+          <div style="margin-top:4px; font-size:12px; color:#9fb0c3;" id="editSubtitle">—</div>
+        </div>
+        <button id="editCloseBtn" title="Close">✕</button>
+      </div>
+
+      <div style="margin-top:12px; display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+        <div style="background:#0f1521; border:1px solid #223046; border-radius:10px; padding:10px;">
+          <div style="font-size:12px; color:#9fb0c3;">Current value</div>
+          <div style="margin-top:6px; font-size:20px; font-weight:800;" id="editCurrent">—</div>
+        </div>
+        <div style="background:#0f1521; border:1px solid #223046; border-radius:10px; padding:10px;">
+          <div style="font-size:12px; color:#9fb0c3;">Override value</div>
+          <input id="editNewValue" type="number" step="any" style="margin-top:6px; width:100%; padding:10px; border-radius:10px; background:#0b0f14; border:1px solid #223046; color:#e7eef7; font-size:14px;" />
+          <div class="muted" style="margin-top:6px">Leave blank to remove the override.</div>
+        </div>
+      </div>
+
+      <div class="notice" style="margin-top:12px">
+        Edits are stored locally as <b>overrides</b>. Your original ZIP is never modified.
+        You can later export a “patched” dataset if you want a portable copy.
+      </div>
+
+      <div class="btnrow" style="margin-top:12px; justify-content:flex-end;">
+        <button id="editResetBtn">Remove override</button>
+        <button class="primary" id="editSaveBtn">Save</button>
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>
