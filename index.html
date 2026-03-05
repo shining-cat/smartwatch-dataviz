@@ -175,39 +175,73 @@
         <div id="chart2" class="chart small" style="margin-top:12px; display:none;"></div>
 
       <div id="sleepCharts" style="display:none; margin-top:10px;">
+
+        <!-- ========================================
+             SECTION 1: OVERVIEW
+             ======================================== -->
         <div class="card" style="margin-top:10px">
-          <h2 style="margin-bottom:6px">Sleep duration</h2>
-          <div id="sleepDurationChart" class="chart" style="height:260px"></div>
-          <div class="muted" style="margin-top:6px">Includes a 30-day rolling mean.</div>
-        </div>
-        <div class="card" style="margin-top:10px">
-          <h2 style="margin-bottom:6px">Bedtime scatter</h2>
-          <div id="sleepBedtimeChart" class="chart" style="height:420px"></div>
-          <div class="muted" style="margin-top:6px">Each dot is bedtime; vertical axis is time-of-day.</div>
-        </div>
-        <div class="card" style="margin-top:10px">
-          <h2 style="margin-bottom:6px">Sleep summary</h2>
-          <div id="sleepInsightCards" style="display:flex; gap:8px; flex-wrap:wrap;"></div>
-        </div>
-        <div class="card" style="margin-top:10px">
-          <h2 style="margin-bottom:6px">Weekly patterns</h2>
-          <div id="weeklyPatternChart" class="chart" style="height:320px"></div>
-          <div class="muted" style="margin-top:6px">Average sleep duration per weekday. Bars colored by deviation from weekly mean.</div>
-        </div>
-        <div class="card" style="margin-top:10px">
-          <h2 style="margin-bottom:6px">Pattern insights</h2>
-          <div id="weeklyPatternInsights" style="display:flex; gap:8px; flex-wrap:wrap; flex-direction:column;"></div>
+          <h2 style="margin-bottom:6px; text-transform:uppercase; letter-spacing:1px; color:#3aa0ff; font-size:13px">📊 Overview</h2>
+          <div id="sleepInsightCards" style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px"></div>
         </div>
 
-        <!-- Sleep Deep Dive Components (Agent 1, 2, 3) -->
-        <div class="card" style="margin-top:10px">
-          <h2 style="margin-bottom:6px">Sleep Deep Dive: Duration Analysis</h2>
-          <div id="sleepDeepDiveDuration"></div>
+        <!-- ========================================
+             SECTION 2: DURATION ANALYSIS
+             ======================================== -->
+        <div class="card" style="margin-top:20px">
+          <h2 style="margin-bottom:12px; text-transform:uppercase; letter-spacing:1px; color:#3aa0ff; font-size:13px">💤 Duration Analysis</h2>
+
+          <!-- Timeline view -->
+          <div style="margin-bottom:20px">
+            <h3 style="font-size:14px; margin-bottom:6px; font-weight:600">Duration Over Time</h3>
+            <div id="sleepDurationChart" class="chart" style="height:260px"></div>
+            <div class="muted" style="margin-top:6px">Daily sleep duration with 30-day rolling average</div>
+          </div>
+
+          <!-- Histogram view -->
+          <div>
+            <h3 style="font-size:14px; margin-bottom:6px; font-weight:600">Duration Distribution</h3>
+            <div id="sleepDeepDiveDuration"></div>
+          </div>
         </div>
 
-        <div class="card" style="margin-top:10px">
-          <h2 style="margin-bottom:6px">Sleep Deep Dive: Timing Patterns</h2>
-          <div id="sleepDeepDiveTiming"></div>
+        <!-- ========================================
+             SECTION 3: TIMING PATTERNS
+             ======================================== -->
+        <div class="card" style="margin-top:20px">
+          <h2 style="margin-bottom:12px; text-transform:uppercase; letter-spacing:1px; color:#3aa0ff; font-size:13px">🕐 Timing Patterns</h2>
+
+          <!-- Bedtime scatter -->
+          <div style="margin-bottom:20px">
+            <h3 style="font-size:14px; margin-bottom:6px; font-weight:600">Bedtime Over Time</h3>
+            <div id="sleepBedtimeChart" class="chart" style="height:420px"></div>
+            <div class="muted" style="margin-top:6px">Each dot represents bedtime; vertical axis shows time-of-day</div>
+          </div>
+
+          <!-- Timing insights -->
+          <div>
+            <h3 style="font-size:14px; margin-bottom:6px; font-weight:600">Timing Insights</h3>
+            <div id="sleepDeepDiveTiming"></div>
+          </div>
+        </div>
+
+        <!-- ========================================
+             SECTION 4: WEEKLY PATTERNS
+             ======================================== -->
+        <div class="card" style="margin-top:20px">
+          <h2 style="margin-bottom:12px; text-transform:uppercase; letter-spacing:1px; color:#3aa0ff; font-size:13px">📅 Weekly Patterns</h2>
+
+          <!-- Weekly bar chart -->
+          <div style="margin-bottom:20px">
+            <h3 style="font-size:14px; margin-bottom:6px; font-weight:600">Average Sleep by Weekday</h3>
+            <div id="weeklyPatternChart" class="chart" style="height:320px"></div>
+            <div class="muted" style="margin-top:6px">Bars colored by deviation from weekly mean (green: above, red: below)</div>
+          </div>
+
+          <!-- Pattern insights -->
+          <div>
+            <h3 style="font-size:14px; margin-bottom:6px; font-weight:600">Pattern Insights</h3>
+            <div id="weeklyPatternInsights" style="display:flex; gap:8px; flex-wrap:wrap; flex-direction:column;"></div>
+          </div>
         </div>
 
       </div>
