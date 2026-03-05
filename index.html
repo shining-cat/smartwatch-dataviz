@@ -1559,11 +1559,48 @@
 
     console.log("Timing insights:", { consistency, chronotype });
 
-    // Note: In this v1 implementation, we're not creating new chart containers
-    // The timing patterns are already visualized in the existing bedtime scatter chart
-    // A future v2 could add dedicated side-by-side bedtime/wake time charts
+    // Render timing insights to UI container
+    const container = $(containerId);
+    if (!container) {
+      console.warn("Timing patterns container not found:", containerId);
+      return;
+    }
 
-    // For now, just log the analysis results
+    // Create insight cards
+    const cardHTML = `
+      <div style="display: flex; gap: 12px; flex-wrap: wrap; margin-top: 12px;">
+        <div class="insight-card">
+          <div style="font-size:12px;color:#9fb0c3;">Chronotype</div>
+          <div style="font-size:18px;font-weight:700;margin-top:6px">${chronotype || 'Unknown'}</div>
+          <div class="muted" style="margin-top:6px">Sleep timing pattern</div>
+        </div>
+        <div class="insight-card">
+          <div style="font-size:12px;color:#9fb0c3;">Bedtime Consistency</div>
+          <div style="font-size:18px;font-weight:700;margin-top:6px">
+            ${consistency.bedtimeStdDev != null ? consistency.bedtimeStdDev.toFixed(1) + 'h' : 'N/A'}
+          </div>
+          <div class="muted" style="margin-top:6px">Standard deviation</div>
+        </div>
+        <div class="insight-card">
+          <div style="font-size:12px;color:#9fb0c3;">Wake Time Consistency</div>
+          <div style="font-size:18px;font-weight:700;margin-top:6px">
+            ${consistency.wakeTimeStdDev != null ? consistency.wakeTimeStdDev.toFixed(1) + 'h' : 'N/A'}
+          </div>
+          <div class="muted" style="margin-top:6px">Standard deviation</div>
+        </div>
+        <div class="insight-card">
+          <div style="font-size:12px;color:#9fb0c3;">Overall Consistency Score</div>
+          <div style="font-size:18px;font-weight:700;margin-top:6px">
+            ${consistency.consistencyScore != null ? consistency.consistencyScore.toFixed(0) + '/100' : 'N/A'}
+          </div>
+          <div class="muted" style="margin-top:6px">Higher is more consistent</div>
+        </div>
+      </div>
+    `;
+
+    container.innerHTML = cardHTML;
+
+    // Log the analysis results to console for debugging
     console.log("Bedtime consistency (std dev):", consistency.bedtimeStdDev?.toFixed(2), "hours");
     console.log("Wake time consistency (std dev):", consistency.wakeTimeStdDev?.toFixed(2), "hours");
     console.log("Overall consistency score:", consistency.consistencyScore?.toFixed(1), "/100");
@@ -1800,12 +1837,35 @@
       return { color: '#3aa0ff' }; // Normal
     });
 
-    // Create or get chart instance
+    // Create or get chart instance (DEFENSIVE: check echarts available)
     if (!window.weeklyPatternChart){
-      window.weeklyPatternChart = echarts.init(container, null, { renderer: "canvas" });
-      window.addEventListener("resize", () => {
-        try { window.weeklyPatternChart.resize(); } catch(e){}
-      });
+      try {
+        if (typeof echarts === 'undefined'){
+          console.error('ECharts library not loaded');
+          container.innerHTML = '<div class="notice">Chart library not available</div>';
+          return;
+        }
+        window.weeklyPatternChart = echarts.init(container, null, { renderer: "canvas" });
+        if (!window.weeklyPatternChart || typeof window.weeklyPatternChart.setOption !== 'function'){
+          console.error('Failed to initialize weekly pattern chart');
+          container.innerHTML = '<div class="notice">Failed to initialize chart</div>';
+          return;
+        }
+        window.addEventListener("resize", () => {
+          try { window.weeklyPatternChart?.resize(); } catch(e){}
+        });
+      } catch (error) {
+        console.error('Weekly pattern chart initialization error:', error);
+        container.innerHTML = `<div class="notice">Chart initialization failed: ${error.message}</div>`;
+        return;
+      }
+    }
+
+    // Verify chart is valid before using
+    if (!window.weeklyPatternChart || typeof window.weeklyPatternChart.setOption !== 'function'){
+      console.error('Invalid chart instance');
+      container.innerHTML = '<div class="notice">Invalid chart instance</div>';
+      return;
     }
 
     window.weeklyPatternChart.setOption({
