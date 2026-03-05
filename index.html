@@ -393,6 +393,37 @@
           }
           if (!iso) return;
 
+          /**
+           * ========================================
+           * SLEEP DATA MODEL CONTRACT
+           * ========================================
+           * (Shared across all Sleep Deep Dive components)
+           *
+           * Parsed sleep data structure for Sleep Deep Dive components:
+           *
+           * sleepData = [
+           *   {
+           *     date: '2024-01-15',           // ISO date string (wake-up date)
+           *     from: '2024-01-14T23:30:00',  // ISO datetime string (bedtime)
+           *     to: '2024-01-15T07:15:00',    // ISO datetime string (wake time)
+           *     durationMinutes: 465,         // Total sleep duration in minutes
+           *     durationHours: 7.75,          // Duration in hours (for display)
+           *     dayOfWeek: 1,                 // 0=Sunday, 1=Monday, ..., 6=Saturday
+           *     weekdayName: 'Monday'         // Human-readable weekday name
+           *   },
+           *   // ... more entries
+           * ]
+           *
+           * This model is used by:
+           * - Duration Analysis Component (Agent 1)
+           * - Timing Patterns Component (Agent 2)
+           * - Weekly Pattern Detection Component (Agent 3)
+           *
+           * Data source: sleep.csv from health export ZIP
+           * Parsing location: parseSingleCSV() function (below)
+           * ========================================
+           */
+
           let value = null;
 
           if (lower === "sleep.csv"){
