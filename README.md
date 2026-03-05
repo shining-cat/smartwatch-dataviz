@@ -6,7 +6,10 @@ Privacy-first health data visualization tool that runs entirely in your browser.
 
 - **Timeline Dashboard:** Multi-metric time series with rolling averages and normalization
 - **Weekly Seasonality:** Calendar heatmap and weekday pattern analysis
-- **Sleep Deep Dive:** Duration analysis, timing patterns, and weekly insights (coming soon)
+- **Sleep Deep Dive:** Comprehensive sleep analysis with three components:
+  - **Duration Analysis:** Sleep duration distribution, averages, consistency scoring, and healthy range highlighting
+  - **Timing Patterns:** Bedtime/wake time consistency, chronotype detection (early-bird/night-owl/intermediate)
+  - **Weekly Patterns:** Weekday effects, weekend vs weekday comparison, recurring pattern insights
 
 ## How to Use
 
