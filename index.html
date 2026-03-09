@@ -481,10 +481,10 @@
             }
 
             // Calculate duration in minutes
-            const durationMinutes = (toDt.getTime() - fromDt.getTime()) / 60000;
+            const durationMinutes = (toDt.getTime() - fromDt.getTime()) / MS_PER_MINUTE;
 
             // Validate duration (0 < duration < 1440 minutes = 24 hours)
-            if (durationMinutes <= 0 || durationMinutes >= 1440) {
+            if (durationMinutes <= 0 || durationMinutes >= MINUTES_PER_DAY) {
               console.warn(`Invalid duration in activities.csv: ${durationMinutes} minutes`);
               return;
             }
@@ -511,17 +511,17 @@
             const elevation = dataObj.elevation ? parseFloat(dataObj.elevation) : null;
 
             // Validate HR if present (30-200 bpm)
-            if (hrAverage !== null && (isNaN(hrAverage) || hrAverage < 30 || hrAverage > 200)) {
+            if (hrAverage !== null && (isNaN(hrAverage) || hrAverage < HR_MIN_BPM || hrAverage > HR_MAX_BPM)) {
               console.warn(`Invalid heart rate in activities.csv: ${hrAverage}`);
               return;
             }
 
-            if (hrMin !== null && (isNaN(hrMin) || hrMin < 30 || hrMin > 200)) {
+            if (hrMin !== null && (isNaN(hrMin) || hrMin < HR_MIN_BPM || hrMin > HR_MAX_BPM)) {
               console.warn(`Invalid heart rate min in activities.csv: ${hrMin}`);
               return;
             }
 
-            if (hrMax !== null && (isNaN(hrMax) || hrMax < 30 || hrMax > 200)) {
+            if (hrMax !== null && (isNaN(hrMax) || hrMax < HR_MIN_BPM || hrMax > HR_MAX_BPM)) {
               console.warn(`Invalid heart rate max in activities.csv: ${hrMax}`);
               return;
             }
@@ -583,6 +583,10 @@
     const rowsBuffer = [];
     const sleepRecordsBuffer = [];
     const BATCH = 2000;
+    const MS_PER_MINUTE = 60000;
+    const MINUTES_PER_DAY = 1440;
+    const HR_MIN_BPM = 30;
+    const HR_MAX_BPM = 200;
     const lower = filename.toLowerCase();
 
     function flush(){
@@ -665,7 +669,7 @@
             const toDt = toRaw ? new Date(String(toRaw)) : null;
 
             if (fromDt && toDt && !isNaN(fromDt.getTime()) && !isNaN(toDt.getTime())){
-              value = Math.max(0, (toDt.getTime() - fromDt.getTime())/60000);
+              value = Math.max(0, (toDt.getTime() - fromDt.getTime())/MS_PER_MINUTE);
               // For daily grouping, we assign the sleep to the wake-up day (the "to" date)
               iso = isoDateFromEpochMs(toDt.getTime());
 
