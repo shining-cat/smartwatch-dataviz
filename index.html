@@ -409,7 +409,7 @@
     const skipped = allFiles.length - dailyFiles.length;
     if (skipped > 0) log(`Skipping ${skipped} files (raw streams etc.) for MVP speed.`);
     if (dailyFiles.length === 0){
-      log("No supported files found. Expected aggregates_*.csv, weight.csv, sleep.csv");
+      log("No supported files found. Expected aggregates_*.csv, weight.csv, sleep.csv, activities.csv");
       setProgress(0, "No supported files found in ZIP.");
       return;
     }
