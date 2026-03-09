@@ -415,6 +415,8 @@
     }
 
     await db.daily.clear();
+    if (db.sleepRecords) await db.sleepRecords.clear();
+    if (db.activityRecords) await db.activityRecords.clear();
     await db.meta.put({ key:"sourceZipName", value:file.name });
     await db.meta.put({ key:"ingestedAt", value: Date.now() });
 
@@ -426,7 +428,14 @@
       setProgress(Math.round((i-1)/dailyFiles.length*100), `Parsing ${i}/${dailyFiles.length}: ${base}`);
       log(`Parsing ${base} → metric "${metric}"`);
       const text = await zip.files[name].async("string");
-      await parseAndStoreDailyCSV(base, metric, text);
+
+      // Route activities.csv to dedicated parser
+      if (base.toLowerCase() === "activities.csv") {
+        await ingestActivitiesCSV(base, text);
+      } else {
+        await parseAndStoreDailyCSV(base, metric, text);
+      }
+
       setProgress(Math.round((i)/dailyFiles.length*100), `Parsed ${i}/${dailyFiles.length}: ${base}`);
     }
 
@@ -440,6 +449,119 @@
     } catch(e){ console.error(e); }
     await refreshMetricPickersFromDB();
     await renderDefault();
+  }
+
+  async function ingestActivitiesCSV(filename, csvText){
+    return new Promise((resolve, reject) => {
+      const activityRecords = [];
+
+      Papa.parse(csvText, {
+        header: true,
+        skipEmptyLines: true,
+        dynamicTyping: false, // Keep Data as string for JSON.parse
+        step: (results) => {
+          const r = results.data || {};
+
+          try {
+            // Parse timestamps
+            const fromRaw = r.from || r.From;
+            const toRaw = r.to || r.To;
+            const fromDt = fromRaw ? new Date(String(fromRaw)) : null;
+            const toDt = toRaw ? new Date(String(toRaw)) : null;
+
+            // Validate timestamps
+            if (!fromDt || !toDt || isNaN(fromDt.getTime()) || isNaN(toDt.getTime())) {
+              console.warn(`Invalid timestamps in activities.csv: from=${fromRaw}, to=${toRaw}`);
+              return;
+            }
+
+            if (fromDt >= toDt) {
+              console.warn(`Invalid time range in activities.csv: from >= to (${fromRaw} >= ${toRaw})`);
+              return;
+            }
+
+            // Calculate duration in minutes
+            const durationMinutes = (toDt.getTime() - fromDt.getTime()) / 60000;
+
+            // Validate duration (0 < duration < 1440 minutes = 24 hours)
+            if (durationMinutes <= 0 || durationMinutes >= 1440) {
+              console.warn(`Invalid duration in activities.csv: ${durationMinutes} minutes`);
+              return;
+            }
+
+            // Extract date from 'from' timestamp
+            const date = fromDt.toISOString().split('T')[0];
+
+            // Parse Data JSON field
+            let dataObj = {};
+            const dataRaw = r.Data || r.data;
+            if (dataRaw) {
+              try {
+                dataObj = JSON.parse(String(dataRaw));
+              } catch (e) {
+                console.warn(`Failed to parse Data JSON in activities.csv: ${e.message}`);
+              }
+            }
+
+            // Extract and validate optional fields
+            const hrAverage = dataObj.hr_average ? parseFloat(dataObj.hr_average) : null;
+            const distance = dataObj.distance ? parseFloat(dataObj.distance) : null;
+            const elevation = dataObj.elevation ? parseFloat(dataObj.elevation) : null;
+
+            // Validate HR if present (30-200 bpm)
+            if (hrAverage !== null && (isNaN(hrAverage) || hrAverage < 30 || hrAverage > 200)) {
+              console.warn(`Invalid heart rate in activities.csv: ${hrAverage}`);
+              return;
+            }
+
+            // Validate distance/elevation if present (>= 0)
+            if (distance !== null && (isNaN(distance) || distance < 0)) {
+              console.warn(`Invalid distance in activities.csv: ${distance}`);
+              return;
+            }
+
+            if (elevation !== null && (isNaN(elevation) || elevation < 0)) {
+              console.warn(`Invalid elevation in activities.csv: ${elevation}`);
+              return;
+            }
+
+            // Create activity record
+            const activityRecord = {
+              date,
+              from: fromDt.toISOString(),
+              to: toDt.toISOString(),
+              durationMinutes,
+              activityType: r['Activity type'] || r.Type || r.type || 'Unknown',
+              hrAverage,
+              distance,
+              elevation,
+              calories: dataObj.calories ? parseFloat(dataObj.calories) : null,
+              steps: dataObj.steps ? parseFloat(dataObj.steps) : null
+            };
+
+            activityRecords.push(activityRecord);
+          } catch (e) {
+            console.warn(`Error processing activity record: ${e.message}`, r);
+          }
+        },
+        complete: async () => {
+          try {
+            if (activityRecords.length > 0 && db.activityRecords) {
+              await db.activityRecords.bulkPut(activityRecords);
+              console.log(`Stored ${activityRecords.length} activity records`);
+            }
+            resolve();
+          } catch (e) {
+            console.error(`Failed to store activity records: ${e.message}`);
+            reject(e);
+          }
+        },
+        error: (err) => {
+          console.error(`Error parsing activities.csv: ${err.message}`);
+          reject(err);
+        }
+      });
+    });
   }
 
   async function parseAndStoreDailyCSV(filename, metric, csvText){
