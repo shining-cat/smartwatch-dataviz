@@ -377,7 +377,7 @@
   // We only ingest "daily-ish" CSVs for the MVP. We also skip:
   // - anything with "calories" (you don't care about those)
   // - anything labeled "manual" (too irregular)
-  const DAILY_FILES_ALLOW = [/^aggregates_.*\.csv$/i, /^weight\.csv$/i, /^sleep\.csv$/i];
+  const DAILY_FILES_ALLOW = [/^aggregates_.*\.csv$/i, /^weight\.csv$/i, /^sleep\.csv$/i, /^activities\.csv$/i];
 
   function isAllowedDailyFile(name){
     const base = name.split("/").pop();
@@ -393,6 +393,7 @@
     if (b.startsWith("aggregates_")) return base.replace(/\.csv$/i,"");
     if (b === "weight.csv") return "weight";
     if (b === "sleep.csv") return "sleep_duration_min";
+    if (b === "activities.csv") return "activities";
     return base.replace(/\.csv$/i,"");
   }
 
