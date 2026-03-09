@@ -351,12 +351,21 @@
     overrides: "[metric+date], metric, date",
     sleepRecords: "date, from, to"
   });
+  // v4 adds activityRecords table for Activity tab
+  db.version(4).stores({
+    daily: "[metric+date], metric, date",
+    meta: "key",
+    overrides: "[metric+date], metric, date",
+    sleepRecords: "date, from, to",
+    activityRecords: "date, activityType, from"
+  });
 
   async function wipeStorage(){
     await db.daily.clear();
     await db.meta.clear();
     if (db.overrides) await db.overrides.clear();
     if (db.sleepRecords) await db.sleepRecords.clear();
+    if (db.activityRecords) await db.activityRecords.clear();
     setStatus("no data loaded");
     $("kpis").style.display = "none";
     $("metricSelect").innerHTML = "";
