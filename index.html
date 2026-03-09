@@ -103,7 +103,7 @@
       <div class="card">
         <div class="tabs">
           <div class="tab active" id="tabTimeline">Timeline</div>
-          <div class="tab" id="tabSeasonality">Weekly seasonality</div>
+          <div class="tab" id="tabActivity">Activity</div>
           <div class="tab" id="tabSleep">Sleep</div>
         </div>
 
@@ -134,31 +134,6 @@
           </div>
         </div>
 
-        <div id="controlsSeasonality" class="card" style="display:none; background:transparent; border:none; padding:0; margin-bottom:10px">
-          <div class="row" style="align-items:flex-start">
-            <div style="flex:1; min-width: 260px;">
-              <label title="Pick which metric to visualize as a calendar heatmap and weekday averages.">Metric</label>
-              <select id="seasonMetric"></select>
-              <div class="muted" style="margin-top:6px">Calendar heatmap + weekday averages.</div>
-            </div>
-            <div style="flex:1; min-width: 260px;">
-              <label title="Showing many years makes each day too small. Pick a shorter window for readability.">Range</label>
-              <select id="seasonRange">
-                <option value="1y">Last 1 year</option>
-                <option value="2y" selected>Last 2 years</option>
-                <option value="all">All time</option>
-              </select>
-              <div class="muted" style="margin-top:6px">Tip: start with 2 years, then zoom out if needed.</div>
-            </div>
-            <div style="flex:1; min-width: 260px;">
-              <label>Options</label>
-              <div class="row" style="margin-top:10px">
-                <button id="renderSeasonBtn" class="primary">Render seasonality</button>
-              </div>
-            </div>
-          </div>
-        </div>
-
         <div id="controlsSleep" style="display:none">
           <div class="card" style="padding:12px">
             <div class="row" style="justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px">
@@ -178,6 +153,33 @@
             </div>
             <div class="muted" style="margin-top:6px">
               Master date range filters all charts and stats on this page. Change range and click Render to update.
+            </div>
+          </div>
+        </div>
+
+        <div id="controlsActivity" style="display:none">
+          <div class="card" style="padding:12px">
+            <div class="row" style="justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px">
+              <h2 style="margin:0">Activity dashboard</h2>
+              <div class="row" style="gap:10px; align-items:center; flex-wrap:wrap">
+                <label for="activityTypeSelect" style="margin:0" title="Filter by activity type">Activity Type:</label>
+                <select id="activityTypeSelect" style="width:150px">
+                  <option value="all" selected>All Activities</option>
+                </select>
+                <label for="activityRangeSelect" style="margin:0" title="Filter all activity data by date range">Date Range:</label>
+                <select id="activityRangeSelect" style="width:150px">
+                  <option value="1m">Last month</option>
+                  <option value="3m">Last 3 months</option>
+                  <option value="6m">Last 6 months</option>
+                  <option value="1y">Last 1 year</option>
+                  <option value="2y">Last 2 years</option>
+                  <option value="all" selected>All time</option>
+                </select>
+                <button id="renderActivityBtn" title="Render activity charts">Render activity</button>
+              </div>
+            </div>
+            <div class="muted" style="margin-top:6px">
+              Master date range filters all charts. Activity type filter shows/hides relevant metrics.
             </div>
           </div>
         </div>
@@ -253,6 +255,66 @@
             <h3 style="font-size:14px; margin-bottom:6px; font-weight:600" title="Identifies significant patterns in your weekly sleep, such as differences between weekdays and weekends, or specific days that stand out">Pattern Insights</h3>
             <div id="weeklyPatternInsights" style="display:flex; gap:8px; flex-wrap:wrap; flex-direction:column;"></div>
           </div>
+        </div>
+
+      </div>
+
+      <div id="activityCharts" style="display:none; margin-top:10px;">
+
+        <!-- ========================================
+             SECTION 1: DAILY STEPS
+             ======================================== -->
+        <div class="card" style="margin-top:10px">
+          <h2 style="margin-bottom:12px; text-transform:uppercase; letter-spacing:1px; color:#3aa0ff; font-size:13px">📊 Daily Steps</h2>
+
+          <h3 style="font-size:14px; margin-bottom:6px; font-weight:600">Steps Over Time</h3>
+          <div id="stepsTimeSeriesChart" class="chart" style="height:280px"></div>
+
+          <h3 style="font-size:14px; margin-top:20px; margin-bottom:6px; font-weight:600">Weekly Average</h3>
+          <div id="stepsWeeklyChart" class="chart" style="height:240px"></div>
+        </div>
+
+        <!-- ========================================
+             SECTION 2: WORKOUT HABITS
+             ======================================== -->
+        <div class="card" style="margin-top:20px">
+          <h2 style="margin-bottom:12px; text-transform:uppercase; letter-spacing:1px; color:#3aa0ff; font-size:13px">💪 Workout Habits</h2>
+
+          <!-- Overview Cards -->
+          <div id="workoutOverviewCards"></div>
+
+          <!-- Calendar Heatmap -->
+          <h3 style="font-size:14px; margin-top:20px; margin-bottom:6px; font-weight:600">Workout Calendar</h3>
+          <div id="workoutHeatmapChart" class="chart" style="height:400px"></div>
+
+          <!-- Activity Type Distribution -->
+          <h3 style="font-size:14px; margin-top:20px; margin-bottom:6px; font-weight:600">Activity Type Distribution</h3>
+          <div id="activityTypeChart" class="chart" style="height:320px"></div>
+
+          <!-- Weekly Patterns -->
+          <h3 style="font-size:14px; margin-top:20px; margin-bottom:6px; font-weight:600">Weekly Patterns</h3>
+          <div id="workoutWeeklyPatternChart" class="chart" style="height:320px"></div>
+          <div id="workoutWeeklyInsights" style="margin-top:12px"></div>
+        </div>
+
+        <!-- ========================================
+             SECTION 3: DISTANCE/ELEVATION (conditional)
+             ======================================== -->
+        <div id="distanceElevationSection" class="card" style="margin-top:20px; display:none">
+          <h2 style="margin-bottom:12px; text-transform:uppercase; letter-spacing:1px; color:#3aa0ff; font-size:13px">🗺️ Distance & Elevation</h2>
+
+          <div class="row" style="gap:12px; flex-wrap:wrap">
+            <div style="flex:1; min-width:300px">
+              <h3 style="font-size:14px; margin-bottom:6px; font-weight:600">Distance Over Time</h3>
+              <div id="distanceChart" class="chart" style="height:280px"></div>
+            </div>
+            <div style="flex:1; min-width:300px">
+              <h3 style="font-size:14px; margin-bottom:6px; font-weight:600">Elevation Over Time</h3>
+              <div id="elevationChart" class="chart" style="height:280px"></div>
+            </div>
+          </div>
+
+          <div id="distanceElevationCards" style="margin-top:16px"></div>
         </div>
 
       </div>
