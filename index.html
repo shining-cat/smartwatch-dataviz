@@ -332,6 +332,12 @@
   });
 
 
+  // Constants
+  const MS_PER_MINUTE = 60000;
+  const MINUTES_PER_DAY = 1440;
+  const HR_MIN_BPM = 30;
+  const HR_MAX_BPM = 200;
+
   // IndexedDB
   const db = new Dexie("withingsLocalViz");
   db.version(1).stores({
@@ -583,10 +589,6 @@
     const rowsBuffer = [];
     const sleepRecordsBuffer = [];
     const BATCH = 2000;
-    const MS_PER_MINUTE = 60000;
-    const MINUTES_PER_DAY = 1440;
-    const HR_MIN_BPM = 30;
-    const HR_MAX_BPM = 200;
     const lower = filename.toLowerCase();
 
     function flush(){
