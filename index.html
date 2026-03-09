@@ -505,12 +505,24 @@
 
             // Extract and validate optional fields
             const hrAverage = dataObj.hr_average ? parseFloat(dataObj.hr_average) : null;
+            const hrMin = dataObj.hr_min ? parseFloat(dataObj.hr_min) : null;
+            const hrMax = dataObj.hr_max ? parseFloat(dataObj.hr_max) : null;
             const distance = dataObj.distance ? parseFloat(dataObj.distance) : null;
             const elevation = dataObj.elevation ? parseFloat(dataObj.elevation) : null;
 
             // Validate HR if present (30-200 bpm)
             if (hrAverage !== null && (isNaN(hrAverage) || hrAverage < 30 || hrAverage > 200)) {
               console.warn(`Invalid heart rate in activities.csv: ${hrAverage}`);
+              return;
+            }
+
+            if (hrMin !== null && (isNaN(hrMin) || hrMin < 30 || hrMin > 200)) {
+              console.warn(`Invalid heart rate min in activities.csv: ${hrMin}`);
+              return;
+            }
+
+            if (hrMax !== null && (isNaN(hrMax) || hrMax < 30 || hrMax > 200)) {
+              console.warn(`Invalid heart rate max in activities.csv: ${hrMax}`);
               return;
             }
 
@@ -531,8 +543,11 @@
               from: fromDt.toISOString(),
               to: toDt.toISOString(),
               durationMinutes,
+              durationHours: Math.round(durationMinutes / 60 * 100) / 100,
               activityType: r['Activity type'] || r.Type || r.type || 'Unknown',
               hrAverage,
+              hrMin,
+              hrMax,
               distance,
               elevation,
               calories: dataObj.calories ? parseFloat(dataObj.calories) : null,
