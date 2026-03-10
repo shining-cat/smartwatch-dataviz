@@ -2497,6 +2497,83 @@
   }
 
   /**
+   * Calculate trends by comparing current vs previous period
+   * @param {Object} currentStats - Current period statistics
+   * @param {Object} previousStats - Previous period statistics (null for "all time")
+   * @returns {Object} Trend objects for each metric
+   */
+  function calculateTrends(currentStats, previousStats) {
+    const trends = {
+      workoutsPerWeek: null,
+      currentStreak: null,
+      longestGap: null,
+      avgDuration: null
+    };
+
+    // No trends for "all time" or missing previous data
+    if (!previousStats) {
+      return trends;
+    }
+
+    // Helper to calculate trend
+    const calcTrend = (current, previous, invertColors = false) => {
+      if (previous === 0 && current === 0) {
+        return { direction: 'stable', text: 'No data' };
+      }
+      if (previous === 0) {
+        return { direction: 'up', text: 'New data' };
+      }
+
+      const change = ((current - previous) / previous) * 100;
+      let direction;
+
+      if (Math.abs(change) < 5) {
+        direction = 'stable';
+      } else if (change > 0) {
+        direction = invertColors ? 'down' : 'up';
+      } else {
+        direction = invertColors ? 'up' : 'down';
+      }
+
+      const text = Math.abs(change) < 5
+        ? 'Stable'
+        : `${Math.abs(change).toFixed(0)}% vs previous period`;
+
+      return { direction, text };
+    };
+
+    // Calculate trends for each metric
+    trends.workoutsPerWeek = calcTrend(
+      currentStats.workoutsPerWeek,
+      previousStats.workoutsPerWeek
+    );
+
+    // Current streak: special case for starting from 0
+    if (previousStats.currentStreak === 0 && currentStats.currentStreak > 0) {
+      trends.currentStreak = { direction: 'up', text: 'Started!' };
+    } else {
+      trends.currentStreak = calcTrend(
+        currentStats.currentStreak,
+        previousStats.currentStreak
+      );
+    }
+
+    // Longest gap: inverted (lower is better)
+    trends.longestGap = calcTrend(
+      currentStats.longestGap,
+      previousStats.longestGap,
+      true  // invert colors
+    );
+
+    trends.avgDuration = calcTrend(
+      currentStats.avgDuration,
+      previousStats.avgDuration
+    );
+
+    return trends;
+  }
+
+  /**
    * Format duration in minutes to human-readable string
    * @param {number} minutes - Duration in minutes
    * @returns {string} Formatted duration (e.g., "1h 30min" or "45 min")
