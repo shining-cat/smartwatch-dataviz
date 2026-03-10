@@ -261,20 +261,7 @@
       <div id="activityCharts" style="display:none; margin-top:10px;">
 
         <!-- ========================================
-             SECTION 1: DAILY STEPS
-             ======================================== -->
-        <div class="card" style="margin-top:10px">
-          <h2 style="margin-bottom:12px; text-transform:uppercase; letter-spacing:1px; color:#3aa0ff; font-size:13px">📊 Daily Steps</h2>
-
-          <h3 style="font-size:14px; margin-bottom:6px; font-weight:600">Steps Over Time</h3>
-          <div id="stepsTimeSeriesChart" class="chart" style="height:280px"></div>
-
-          <h3 style="font-size:14px; margin-top:20px; margin-bottom:6px; font-weight:600">Weekly Average</h3>
-          <div id="stepsWeeklyChart" class="chart" style="height:240px"></div>
-        </div>
-
-        <!-- ========================================
-             SECTION 2: WORKOUT HABITS
+             SECTION 1: WORKOUT HABITS
              ======================================== -->
         <div class="card" style="margin-top:20px">
           <h2 style="margin-bottom:12px; text-transform:uppercase; letter-spacing:1px; color:#3aa0ff; font-size:13px">💪 Workout Habits</h2>
@@ -299,7 +286,7 @@
         </div>
 
         <!-- ========================================
-             SECTION 3: DISTANCE/ELEVATION (conditional)
+             SECTION 2: DISTANCE/ELEVATION (conditional)
              ======================================== -->
         <div id="distanceElevationSection" class="card" style="margin-top:20px; display:none">
           <h2 style="margin-bottom:12px; text-transform:uppercase; letter-spacing:1px; color:#3aa0ff; font-size:13px">🗺️ Distance & Elevation</h2>
@@ -316,6 +303,19 @@
           </div>
 
           <div id="distanceElevationCards" style="margin-top:16px"></div>
+        </div>
+
+        <!-- ========================================
+             SECTION 3: DAILY STEPS
+             ======================================== -->
+        <div class="card" style="margin-top:20px">
+          <h2 style="margin-bottom:12px; text-transform:uppercase; letter-spacing:1px; color:#3aa0ff; font-size:13px">📊 Daily Steps</h2>
+
+          <h3 style="font-size:14px; margin-bottom:6px; font-weight:600">Steps Over Time</h3>
+          <div id="stepsTimeSeriesChart" class="chart" style="height:280px"></div>
+
+          <h3 style="font-size:14px; margin-top:20px; margin-bottom:6px; font-weight:600">Weekly Average</h3>
+          <div id="stepsWeeklyChart" class="chart" style="height:240px"></div>
         </div>
 
       </div>
@@ -3209,16 +3209,11 @@
         filteredRecords = activityRecords.filter(r => r.activityType === selectedType);
       }
 
-      // Section 1: Daily Steps
-      setProgress(40, "Rendering daily steps…");
-      const stepData = await fetchStepAggregates();
-      await renderDailySteps(stepData, cutoffDate);
-
-      // Section 2: Workout Habits
-      setProgress(60, "Rendering workout overview…");
+      // Section 1: Workout Habits
+      setProgress(40, "Rendering workout overview…");
       renderWorkoutOverview(filteredRecords, selectedType);
 
-      setProgress(70, "Rendering workout heatmap…");
+      setProgress(50, "Rendering workout heatmap…");
       await renderWorkoutHeatmap(filteredRecords, cutoffDate);
 
       // Only show activity type distribution when viewing all types
@@ -3226,19 +3221,24 @@
       const typeSection = $("activityTypeSection");
       if (selectedType === 'all') {
         if (typeSection) typeSection.style.display = '';
-        setProgress(80, "Rendering activity distribution…");
+        setProgress(60, "Rendering activity distribution…");
         renderActivityTypeDistribution(filteredRecords);
       } else {
         // Hide the entire distribution section when filtering to specific type
         if (typeSection) typeSection.style.display = 'none';
       }
 
-      setProgress(85, "Rendering weekly patterns…");
+      setProgress(70, "Rendering weekly patterns…");
       renderWorkoutWeeklyPatterns(filteredRecords);
 
-      // Section 3: Distance/Elevation (conditional)
-      setProgress(90, "Rendering distance/elevation…");
+      // Section 2: Distance/Elevation (conditional)
+      setProgress(80, "Rendering distance/elevation…");
       renderDistanceElevation(filteredRecords, selectedType);
+
+      // Section 3: Daily Steps
+      setProgress(90, "Rendering daily steps…");
+      const stepData = await fetchStepAggregates();
+      await renderDailySteps(stepData, cutoffDate);
 
       setProgress(100, "Activity dashboard ready");
     } catch (error) {
