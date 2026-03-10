@@ -945,7 +945,11 @@
       if (sleepCount > 0) await renderSleepDashboard();
 
       const activityCount = await db.activityRecords.count();
-      if (activityCount > 0) await renderActivityDashboard();
+      if (activityCount > 0) {
+        // Populate dropdown before rendering
+        await populateActivityTypeDropdown();
+        await renderActivityDashboard();
+      }
     } catch(e) {
       console.error('Error in renderDefault:', e);
     }
