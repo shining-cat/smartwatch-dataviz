@@ -2227,6 +2227,133 @@
     return data;
   }
 
+  /**
+   * Fetch step aggregates from daily table
+   * @returns {Array<{date: string, steps: number}>} Array of step records sorted by date
+   */
+  async function fetchStepAggregates() {
+    try {
+      const records = await db.daily.where('metricName').equals('aggregates_steps').toArray();
+      return records.map(r => ({
+        date: r.date,
+        steps: r.value
+      })).sort((a,b) => a.date.localeCompare(b.date));
+    } catch (error) {
+      console.error('Failed to fetch step aggregates:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Render Daily Steps section with time series and weekly pattern charts
+   * @param {Array<{date: string, steps: number}>} stepData - Step data records
+   * @param {Date} cutoffDate - Optional date range filter
+   */
+  async function renderDailySteps(stepData, cutoffDate) {
+    // Apply date range filter
+    if (cutoffDate) {
+      const cutoffStr = cutoffDate.toISOString().split('T')[0];
+      stepData = stepData.filter(d => d.date >= cutoffStr);
+    }
+
+    if (stepData.length === 0) {
+      const msg = '<div class="notice">No step data available for selected date range</div>';
+      const chart1 = $("stepsTimeSeriesChart");
+      const chart2 = $("stepsWeeklyChart");
+      if (chart1) chart1.innerHTML = msg;
+      if (chart2) chart2.innerHTML = msg;
+      return;
+    }
+
+    // Time series chart
+    const tsEl = $("stepsTimeSeriesChart");
+    if (tsEl) {
+      if (!window.stepsTimeSeriesChart) {
+        window.stepsTimeSeriesChart = echarts.init(tsEl, null, { renderer:"canvas" });
+        window.addEventListener("resize", ()=>{ try{ window.stepsTimeSeriesChart.resize(); }catch(e){} });
+      }
+
+      const dates = stepData.map(d => d.date);
+      const values = stepData.map(d => d.steps);
+
+      // Calculate 7-day rolling average
+      const rolling = [];
+      for (let i=0; i<values.length; i++){
+        const window = values.slice(Math.max(0, i-6), i+1);
+        const avg = window.reduce((a,b)=>a+b,0) / window.length;
+        rolling.push([dates[i], Math.round(avg)]);
+      }
+
+      const series = dates.map((d,i)=>[d, values[i]]);
+
+      window.stepsTimeSeriesChart.setOption({
+        tooltip:{ trigger:"axis", formatter: (params)=> {
+          const p=params[0]; const v=p?.data?.[1];
+          return `${p.axisValue}<br/>${v != null ? v.toLocaleString() + ' steps' : '—'}`;
+        }},
+        xAxis:{ type:"time", axisLabel:{ color:"#9fb0c3" } },
+        yAxis:{ type:"value", axisLabel:{ color:"#9fb0c3", formatter:(v)=>v.toLocaleString() } },
+        series:[
+          { name:"Daily Steps", type:"bar", data: series, barMaxWidth:12 },
+          { name:"7d average", type:"line", showSymbol:false, smooth:true, data: rolling }
+        ]
+      }, true);
+    }
+
+    // Weekly average chart
+    const weeklyEl = $("stepsWeeklyChart");
+    if (weeklyEl) {
+      if (!window.stepsWeeklyChart) {
+        window.stepsWeeklyChart = echarts.init(weeklyEl, null, { renderer:"canvas" });
+        window.addEventListener("resize", ()=>{ try{ window.stepsWeeklyChart.resize(); }catch(e){} });
+      }
+
+      // Group by weekday
+      const weekdayBuckets = Array.from({length:7}, ()=>({sum:0, count:0}));
+      stepData.forEach(d => {
+        const dt = new Date(d.date + "T00:00:00");
+        const wd = (dt.getDay() + 6) % 7; // Mon=0, Sun=6
+        weekdayBuckets[wd].sum += d.steps;
+        weekdayBuckets[wd].count += 1;
+      });
+
+      const weekdayNames = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+      const weekdayAvgs = weekdayBuckets.map(b => b.count > 0 ? Math.round(b.sum / b.count) : 0);
+      const weeklyMean = weekdayAvgs.reduce((a,b)=>a+b,0) / weekdayAvgs.length;
+
+      // Color code: green if >10% above mean, red if <-10% below mean
+      const itemStyle = weekdayAvgs.map(avg => {
+        const deviation = (avg - weeklyMean) / weeklyMean;
+        if (deviation > 0.1) return { color: '#3dce79' }; // green
+        if (deviation < -0.1) return { color: '#ff5a6b' }; // red
+        return { color: '#3aa0ff' }; // blue
+      });
+
+      window.stepsWeeklyChart.setOption({
+        tooltip:{ trigger:"axis", formatter:(params)=>{
+          const p=params[0];
+          const deviation = ((p.value - weeklyMean) / weeklyMean * 100).toFixed(0);
+          const sign = deviation > 0 ? '+' : '';
+          return `${p.name}: ${p.value.toLocaleString()} steps<br/>${sign}${deviation}% vs weekly avg`;
+        }},
+        xAxis:{ type:"category", data: weekdayNames, axisLabel:{ color:"#9fb0c3" } },
+        yAxis:{ type:"value", axisLabel:{ color:"#9fb0c3", formatter:(v)=>v.toLocaleString() } },
+        series:[{
+          type:"bar",
+          data: weekdayAvgs.map((v,i)=>({ value:v, itemStyle:itemStyle[i] }))
+        }]
+      }, true);
+    }
+
+    // Resize charts after render
+    setTimeout(()=>{
+      try {
+        window.stepsTimeSeriesChart?.resize();
+        window.stepsWeeklyChart?.resize();
+      } catch(e){}
+    }, 0);
+  }
+
   async function renderSleepDashboard(){
     setProgress(20, "Rendering sleep dashboard…");
 
