@@ -2591,19 +2591,21 @@
 
     // Determine label visibility based on date span
     const years = totalDays / 365;
-    let monthNameMap = 'en'; // Default: full month names
+    let monthInterval = 0; // 0 = show all
 
     if (years > 3) {
-      // >3 years: Show only January of each year (yearly markers)
-      monthNameMap = ['Jan', '', '', '', '', '', '', '', '', '', '', ''];
+      // >3 years: Show every 12th month (yearly)
+      monthInterval = 11;
     } else if (years > 2) {
-      // 2-3 years: Show Jan and July (twice per year)
-      monthNameMap = ['Jan', '', '', '', '', '', 'Jul', '', '', '', '', ''];
+      // 2-3 years: Show every 6th month (Jan, Jul)
+      monthInterval = 5;
     } else if (years > 1) {
-      // 1-2 years: Show quarterly (Jan, Apr, Jul, Oct)
-      monthNameMap = ['Jan', '', '', 'Apr', '', '', 'Jul', '', '', 'Oct', '', ''];
+      // 1-2 years: Show every 3rd month (quarterly)
+      monthInterval = 2;
     }
-    // <1 year: Show all months (default 'en')
+    // <1 year: Show all months (interval = 0)
+
+    console.log(`Calendar: ${years.toFixed(1)} years, ${totalDays} days, monthInterval=${monthInterval}`);
 
     // Find max workout count for color scale
     const maxWorkouts = Math.max(...heatmapData.map(d => d[1]));
@@ -2701,10 +2703,11 @@
         },
         monthLabel: {
           show: true,
-          fontSize: 10,
-          color: "#6b7a8f",  // Lighter, less prominent
-          nameMap: monthNameMap,
-          margin: 8
+          fontSize: 11,
+          color: "#8a9aaf",  // Medium visibility
+          interval: monthInterval,  // Control label density
+          margin: 10,
+          formatter: '{MMM}'  // Show 3-letter month abbreviations
         },
         dayLabel: {
           fontSize: 10,
