@@ -2645,6 +2645,90 @@
     window.workoutHeatmapChart.resize();
   }
 
+  /**
+   * Render activity type distribution as horizontal bar chart
+   */
+  function renderActivityTypeDistribution(activityRecords) {
+    const containerEl = $("activityTypeChart");
+    if (!containerEl) return;
+
+    // Handle empty data
+    if (!activityRecords || activityRecords.length === 0) {
+      containerEl.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#9fb0c3">No workout data available</div>';
+      return;
+    }
+
+    // Count sessions by activity type
+    const typeCounts = new Map();
+    activityRecords.forEach(record => {
+      const type = record.activityType || 'Unknown';
+      typeCounts.set(type, (typeCounts.get(type) || 0) + 1);
+    });
+
+    // Sort by count descending
+    const sortedTypes = Array.from(typeCounts.entries())
+      .sort((a, b) => b[1] - a[1]);
+
+    const types = sortedTypes.map(([type]) => type);
+    const counts = sortedTypes.map(([, count]) => count);
+    const total = activityRecords.length;
+
+    // Initialize chart if needed
+    if (!window.activityTypeChart) {
+      try {
+        window.activityTypeChart = echarts.init(containerEl, null, { renderer: "canvas" });
+
+        // Add resize listener
+        window.addEventListener("resize", () => {
+          try {
+            window.activityTypeChart?.resize();
+          } catch(e) {}
+        });
+      } catch(e) {
+        console.error("Failed to initialize activity type chart:", e);
+        return;
+      }
+    }
+
+    // Set chart options
+    window.activityTypeChart.setOption({
+      tooltip: {
+        trigger: "axis",
+        axisPointer: { type: "shadow" },
+        formatter: (params) => {
+          const p = params[0];
+          const count = p.value;
+          const percentage = ((count / total) * 100).toFixed(0);
+          return `${p.name}: ${count.toLocaleString()} sessions (${percentage}%)`;
+        }
+      },
+      grid: {
+        left: 120,
+        right: 20,
+        top: 10,
+        bottom: 10
+      },
+      xAxis: {
+        type: "value",
+        axisLabel: { color: "#9fb0c3" },
+        splitLine: { lineStyle: { color: "#1f2a3a" } }
+      },
+      yAxis: {
+        type: "category",
+        data: types,
+        axisLabel: { color: "#9fb0c3" }
+      },
+      series: [{
+        type: "bar",
+        data: counts,
+        itemStyle: { color: "#3aa0ff" }
+      }]
+    }, true);
+
+    // Resize chart after render
+    window.activityTypeChart.resize();
+  }
+
   async function renderSleepDashboard(){
     setProgress(20, "Rendering sleep dashboard…");
 
