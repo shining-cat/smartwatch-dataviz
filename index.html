@@ -2403,7 +2403,7 @@
     }
 
     // Average duration
-    const totalDuration = sorted.reduce((sum, r) => sum + (r.duration || 0), 0);
+    const totalDuration = sorted.reduce((sum, r) => sum + (r.durationMinutes || 0), 0);
     const avgDuration = sessionCount > 0 ? totalDuration / sessionCount : 0;
 
     return {
@@ -2443,7 +2443,7 @@
     // Filter by type if not "all"
     let filteredRecords = activityRecords;
     if (selectedType && selectedType !== "all") {
-      filteredRecords = activityRecords.filter(r => r.type === selectedType);
+      filteredRecords = activityRecords.filter(r => r.activityType === selectedType);
     }
 
     if (filteredRecords.length === 0) {
@@ -2483,9 +2483,9 @@
       }
 
       // Average elevation gain (if available)
-      const withElevation = filteredRecords.filter(r => r.elevationGain != null && r.elevationGain > 0);
+      const withElevation = filteredRecords.filter(r => r.elevation != null && r.elevation > 0);
       if (withElevation.length > 0) {
-        const avgElevation = withElevation.reduce((sum, r) => sum + r.elevationGain, 0) / withElevation.length;
+        const avgElevation = withElevation.reduce((sum, r) => sum + r.elevation, 0) / withElevation.length;
         cardsEl.appendChild(mk("Avg elevation gain", `${Math.round(avgElevation)} m`, "Per session", `Average elevation gain for ${selectedType} workouts`));
       }
     }
