@@ -2589,6 +2589,20 @@
     const usableWidth = Math.max(300, containerWidth - 110);
     const cellSize = Math.max(10, Math.min(20, Math.floor(usableWidth / weeks)));
 
+    // Determine label visibility based on date span
+    const years = totalDays / 365;
+    let monthLabelFormat = 'MMM'; // Default: Jan, Feb, Mar...
+    let showAllMonths = true;
+
+    if (years > 2) {
+      // For >2 years: only show year labels, hide month labels
+      showAllMonths = false;
+    } else if (years > 1) {
+      // For 1-2 years: show quarter months only (Jan, Apr, Jul, Oct)
+      monthLabelFormat = '{MMM}';
+      showAllMonths = false;
+    }
+
     // Find max workout count for color scale
     const maxWorkouts = Math.max(...heatmapData.map(d => d[1]));
 
@@ -2668,23 +2682,39 @@
         },
         textStyle: { color: "#9fb0c3" }
       },
-      title: {
-        text: "Workout Calendar",
-        left: "center",
-        top: 6,
-        textStyle: { color: "#e7eef7", fontSize: 14 }
-      },
       calendar: {
-        top: 50,
+        top: 10,
         left: 30,
         right: 20,
         bottom: 55,
         cellSize: [cellSize, cellSize],
         range: [startDate, endDate],
         itemStyle: { borderWidth: 0.5, borderColor: "#1f2a3a" },
-        yearLabel: { color: "#9fb0c3" },
-        monthLabel: { color: "#9fb0c3" },
-        dayLabel: { color: "#9fb0c3" }
+        yearLabel: {
+          show: true,
+          fontSize: years > 2 ? 14 : 12,
+          color: "#e7eef7",
+          fontWeight: years > 2 ? 'bold' : 'normal'
+        },
+        monthLabel: {
+          show: showAllMonths || years <= 2,
+          fontSize: 10,
+          color: "#6b7a8f",  // Lighter than before
+          nameMap: years > 1 && years <= 2 ? ['J', '', '', 'A', '', '', 'J', '', '', 'O', '', ''] : 'en',
+          margin: 8
+        },
+        dayLabel: {
+          fontSize: 10,
+          color: "#6b7a8f"
+        },
+        splitLine: {
+          show: true,
+          lineStyle: {
+            color: "#2a3a4a",
+            width: 1,
+            type: 'solid'
+          }
+        }
       },
       series: [{
         type: "heatmap",
