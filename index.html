@@ -2162,6 +2162,15 @@
     if (tsEl) {
       if (!window.stepsTimeSeriesChart) {
         window.stepsTimeSeriesChart = echarts.init(tsEl, null, { renderer:"canvas" });
+
+        // Validate initialization
+        if (!window.stepsTimeSeriesChart || typeof window.stepsTimeSeriesChart.setOption !== 'function') {
+          console.error('Failed to initialize steps time series chart');
+          window.stepsTimeSeriesChart = null;
+          tsEl.innerHTML = '<div class="notice">Failed to initialize chart - please try again</div>';
+          return;
+        }
+
         window.addEventListener("resize", ()=>{ try{ window.stepsTimeSeriesChart.resize(); }catch(e){} });
       }
 
@@ -2197,6 +2206,15 @@
     if (weeklyEl) {
       if (!window.stepsWeeklyChart) {
         window.stepsWeeklyChart = echarts.init(weeklyEl, null, { renderer:"canvas" });
+
+        // Validate initialization
+        if (!window.stepsWeeklyChart || typeof window.stepsWeeklyChart.setOption !== 'function') {
+          console.error('Failed to initialize steps weekly chart');
+          window.stepsWeeklyChart = null;
+          weeklyEl.innerHTML = '<div class="notice">Failed to initialize chart - please try again</div>';
+          return;
+        }
+
         window.addEventListener("resize", ()=>{ try{ window.stepsWeeklyChart.resize(); }catch(e){} });
       }
 
@@ -2465,6 +2483,14 @@
       try {
         window.workoutHeatmapChart = echarts.init(containerEl, null, { renderer: "canvas" });
 
+        // Validate initialization
+        if (!window.workoutHeatmapChart || typeof window.workoutHeatmapChart.setOption !== 'function') {
+          console.error('Failed to initialize workout heatmap chart - invalid instance');
+          window.workoutHeatmapChart = null;
+          containerEl.innerHTML = '<div style="text-align:center; color:#ff6b6b; padding:40px 20px;">Failed to initialize chart - please try again</div>';
+          return;
+        }
+
         // Add resize listener
         const resizeObserver = new ResizeObserver(() => {
           if (window.workoutHeatmapChart) {
@@ -2579,6 +2605,14 @@
       try {
         window.activityTypeChart = echarts.init(containerEl, null, { renderer: "canvas" });
 
+        // Validate initialization
+        if (!window.activityTypeChart || typeof window.activityTypeChart.setOption !== 'function') {
+          console.error('Failed to initialize activity type chart - invalid instance');
+          window.activityTypeChart = null;
+          containerEl.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#ff5a6b">Failed to initialize chart - please try again</div>';
+          return;
+        }
+
         // Add resize listener
         window.addEventListener("resize", () => {
           try {
@@ -2587,6 +2621,7 @@
         });
       } catch(e) {
         console.error("Failed to initialize activity type chart:", e);
+        containerEl.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#ff5a6b">Failed to initialize chart</div>';
         return;
       }
     }
@@ -2649,6 +2684,15 @@
     // Initialize chart
     if (!window.workoutWeeklyPatternChart) {
       window.workoutWeeklyPatternChart = echarts.init(chartContainer, null, { renderer:"canvas" });
+
+      // Validate initialization
+      if (!window.workoutWeeklyPatternChart || typeof window.workoutWeeklyPatternChart.setOption !== 'function') {
+        console.error('Failed to initialize workout weekly pattern chart');
+        window.workoutWeeklyPatternChart = null;
+        chartContainer.innerHTML = '<div class="notice">Failed to initialize chart - please try again</div>';
+        return;
+      }
+
       window.addEventListener("resize", ()=>{ try{ window.workoutWeeklyPatternChart.resize(); }catch(e){} });
     }
 
@@ -2798,6 +2842,15 @@
       if (distanceEl) {
         if (!window.distanceChart) {
           window.distanceChart = echarts.init(distanceEl, null, { renderer:"canvas" });
+
+          // Validate initialization
+          if (!window.distanceChart || typeof window.distanceChart.setOption !== 'function') {
+            console.error('Failed to initialize distance chart');
+            window.distanceChart = null;
+            distanceEl.innerHTML = '<div class="notice">Failed to initialize chart - please try again</div>';
+            return;
+          }
+
           window.addEventListener("resize", ()=>{ try{ window.distanceChart.resize(); }catch(e){} });
         }
 
@@ -2829,6 +2882,15 @@
       if (elevationEl) {
         if (!window.elevationChart) {
           window.elevationChart = echarts.init(elevationEl, null, { renderer:"canvas" });
+
+          // Validate initialization
+          if (!window.elevationChart || typeof window.elevationChart.setOption !== 'function') {
+            console.error('Failed to initialize elevation chart');
+            window.elevationChart = null;
+            elevationEl.innerHTML = '<div class="notice">Failed to initialize chart - please try again</div>';
+            return;
+          }
+
           window.addEventListener("resize", ()=>{ try{ window.elevationChart.resize(); }catch(e){} });
         }
 
