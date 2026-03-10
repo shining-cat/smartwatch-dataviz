@@ -2449,6 +2449,54 @@
   }
 
   /**
+   * Calculate workout statistics for the previous equal period
+   * @param {Array} activityRecords - All activity records
+   * @param {string} selectedRange - Selected date range ('1m', '3m', '6m', '1y', '2y', 'all')
+   * @param {Date} cutoffDate - Current period cutoff date
+   * @returns {Object} Statistics for previous period
+   */
+  function calculatePreviousPeriodStats(activityRecords, selectedRange, cutoffDate) {
+    // For "all time", no previous period exists
+    if (!selectedRange || selectedRange === 'all' || !cutoffDate) {
+      return null;
+    }
+
+    // Calculate previous period date range
+    let previousCutoffDate = new Date(cutoffDate);
+
+    switch(selectedRange) {
+      case '1m':
+        previousCutoffDate.setMonth(previousCutoffDate.getMonth() - 1);
+        break;
+      case '3m':
+        previousCutoffDate.setMonth(previousCutoffDate.getMonth() - 3);
+        break;
+      case '6m':
+        previousCutoffDate.setMonth(previousCutoffDate.getMonth() - 6);
+        break;
+      case '1y':
+        previousCutoffDate.setFullYear(previousCutoffDate.getFullYear() - 1);
+        break;
+      case '2y':
+        previousCutoffDate.setFullYear(previousCutoffDate.getFullYear() - 2);
+        break;
+      default:
+        return null;
+    }
+
+    // Filter records to previous period
+    const cutoffStr = cutoffDate.toISOString().split('T')[0];
+    const previousCutoffStr = previousCutoffDate.toISOString().split('T')[0];
+
+    const previousRecords = activityRecords.filter(r =>
+      r.date >= previousCutoffStr && r.date < cutoffStr
+    );
+
+    // Return stats for previous period
+    return calculateWorkoutStats(previousRecords);
+  }
+
+  /**
    * Format duration in minutes to human-readable string
    * @param {number} minutes - Duration in minutes
    * @returns {string} Formatted duration (e.g., "1h 30min" or "45 min")
