@@ -2640,6 +2640,9 @@
         data: heatmapData
       }]
     }, true);
+
+    // Resize chart after render
+    window.workoutHeatmapChart.resize();
   }
 
   async function renderSleepDashboard(){
