@@ -2591,17 +2591,19 @@
 
     // Determine label visibility based on date span
     const years = totalDays / 365;
-    let monthLabelFormat = 'MMM'; // Default: Jan, Feb, Mar...
-    let showAllMonths = true;
+    let monthNameMap = 'en'; // Default: full month names
 
-    if (years > 2) {
-      // For >2 years: only show year labels, hide month labels
-      showAllMonths = false;
+    if (years > 3) {
+      // >3 years: Show only January of each year (yearly markers)
+      monthNameMap = ['Jan', '', '', '', '', '', '', '', '', '', '', ''];
+    } else if (years > 2) {
+      // 2-3 years: Show Jan and July (twice per year)
+      monthNameMap = ['Jan', '', '', '', '', '', 'Jul', '', '', '', '', ''];
     } else if (years > 1) {
-      // For 1-2 years: show quarter months only (Jan, Apr, Jul, Oct)
-      monthLabelFormat = '{MMM}';
-      showAllMonths = false;
+      // 1-2 years: Show quarterly (Jan, Apr, Jul, Oct)
+      monthNameMap = ['Jan', '', '', 'Apr', '', '', 'Jul', '', '', 'Oct', '', ''];
     }
+    // <1 year: Show all months (default 'en')
 
     // Find max workout count for color scale
     const maxWorkouts = Math.max(...heatmapData.map(d => d[1]));
@@ -2692,15 +2694,16 @@
         itemStyle: { borderWidth: 0.5, borderColor: "#1f2a3a" },
         yearLabel: {
           show: true,
-          fontSize: years > 2 ? 14 : 12,
-          color: "#e7eef7",
-          fontWeight: years > 2 ? 'bold' : 'normal'
+          fontSize: years > 3 ? 16 : (years > 2 ? 14 : 12),
+          color: years > 2 ? "#e7eef7" : "#9fb0c3",
+          fontWeight: years > 2 ? 'bold' : 'normal',
+          margin: years > 3 ? 12 : 8
         },
         monthLabel: {
-          show: showAllMonths || years <= 2,
+          show: true,
           fontSize: 10,
-          color: "#6b7a8f",  // Lighter than before
-          nameMap: years > 1 && years <= 2 ? ['J', '', '', 'A', '', '', 'J', '', '', 'O', '', ''] : 'en',
+          color: "#6b7a8f",  // Lighter, less prominent
+          nameMap: monthNameMap,
           margin: 8
         },
         dayLabel: {
