@@ -2541,6 +2541,17 @@
       }
     }
 
+    // Validate chart is still valid before using
+    if (!window.workoutHeatmapChart || typeof window.workoutHeatmapChart.setOption !== 'function') {
+      console.error('Workout heatmap chart became invalid, re-initializing...');
+      window.workoutHeatmapChart = echarts.init(containerEl, null, { renderer: "canvas" });
+      if (!window.workoutHeatmapChart || typeof window.workoutHeatmapChart.setOption !== 'function') {
+        console.error('Failed to re-initialize workout heatmap chart');
+        containerEl.innerHTML = '<div style="text-align:center; color:#ff6b6b; padding:40px 20px;">Chart initialization failed</div>';
+        return;
+      }
+    }
+
     // Render chart
     window.workoutHeatmapChart.setOption({
       tooltip: {
@@ -2658,6 +2669,17 @@
       }
     }
 
+    // Validate chart is still valid before using
+    if (!window.activityTypeChart || typeof window.activityTypeChart.setOption !== 'function') {
+      console.error('Activity type chart became invalid, re-initializing...');
+      window.activityTypeChart = echarts.init(containerEl, null, { renderer: "canvas" });
+      if (!window.activityTypeChart || typeof window.activityTypeChart.setOption !== 'function') {
+        console.error('Failed to re-initialize activity type chart');
+        containerEl.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#ff5a6b">Chart initialization failed</div>';
+        return;
+      }
+    }
+
     // Set chart options
     window.activityTypeChart.setOption({
       tooltip: {
@@ -2761,6 +2783,17 @@
       if (deviation < -0.1) return { color: '#ff5a6b' }; // red
       return { color: '#3aa0ff' }; // blue
     });
+
+    // Validate chart is still valid before using
+    if (!window.workoutWeeklyPatternChart || typeof window.workoutWeeklyPatternChart.setOption !== 'function') {
+      console.error('Workout weekly pattern chart became invalid, re-initializing...');
+      window.workoutWeeklyPatternChart = echarts.init(chartContainer, null, { renderer: "canvas" });
+      if (!window.workoutWeeklyPatternChart || typeof window.workoutWeeklyPatternChart.setOption !== 'function') {
+        console.error('Failed to re-initialize workout weekly pattern chart');
+        chartContainer.innerHTML = '<div class="notice">Chart initialization failed</div>';
+        return;
+      }
+    }
 
     window.workoutWeeklyPatternChart.setOption({
       tooltip:{
@@ -2889,6 +2922,17 @@
         const sorted = withDistance.slice().sort((a,b) => a.date.localeCompare(b.date));
         const distanceData = sorted.map(r => [r.date, (r.distance / 1000).toFixed(2)]); // km
 
+        // Validate chart is still valid before using
+        if (!window.distanceChart || typeof window.distanceChart.setOption !== 'function') {
+          console.error('Distance chart became invalid, re-initializing...');
+          window.distanceChart = echarts.init(distanceEl, null, { renderer: "canvas" });
+          if (!window.distanceChart || typeof window.distanceChart.setOption !== 'function') {
+            console.error('Failed to re-initialize distance chart');
+            distanceEl.innerHTML = '<div class="notice">Chart initialization failed</div>';
+            return;
+          }
+        }
+
         window.distanceChart.setOption({
           tooltip:{
             trigger: "axis",
@@ -2928,6 +2972,17 @@
 
         const sorted = withElevation.slice().sort((a,b) => a.date.localeCompare(b.date));
         const elevationData = sorted.map(r => [r.date, r.elevation]); // meters
+
+        // Validate chart is still valid before using
+        if (!window.elevationChart || typeof window.elevationChart.setOption !== 'function') {
+          console.error('Elevation chart became invalid, re-initializing...');
+          window.elevationChart = echarts.init(elevationEl, null, { renderer: "canvas" });
+          if (!window.elevationChart || typeof window.elevationChart.setOption !== 'function') {
+            console.error('Failed to re-initialize elevation chart');
+            elevationEl.innerHTML = '<div class="notice">Chart initialization failed</div>';
+            return;
+          }
+        }
 
         window.elevationChart.setOption({
           tooltip:{
