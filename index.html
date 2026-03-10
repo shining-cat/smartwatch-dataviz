@@ -2574,6 +2574,51 @@
   }
 
   /**
+   * Detect day-of-week workout patterns
+   * @param {Array} avgWorkoutsPerDay - Array of 7 average workout values (Mon-Sun)
+   * @param {Array} weekdayNames - Array of weekday names
+   * @returns {Array} Array of pattern strings
+   */
+  function detectWeeklyPatterns(avgWorkoutsPerDay, weekdayNames) {
+    const patterns = [];
+
+    // Calculate overall mean
+    const weeklyMean = avgWorkoutsPerDay.reduce((a,b) => a+b, 0) / 7;
+
+    if (weeklyMean === 0) return patterns;  // No data
+
+    // Pattern 1: Weekend warrior (Sat+Sun vs Mon-Fri)
+    const weekendAvg = (avgWorkoutsPerDay[5] + avgWorkoutsPerDay[6]) / 2;  // Sat, Sun
+    const weekdayAvg = avgWorkoutsPerDay.slice(0, 5).reduce((a,b) => a+b, 0) / 5;  // Mon-Fri
+
+    if (weekdayAvg > 0 && weekendAvg / weekdayAvg > 1.5) {
+      const ratio = (weekendAvg / weekdayAvg).toFixed(1);
+      patterns.push(`💪 Weekend warrior: ${ratio}x more workouts Sat/Sun`);
+    }
+
+    // Pattern 2: Peak day (>30% of workouts OR >1.5x mean)
+    const totalWorkouts = avgWorkoutsPerDay.reduce((a,b) => a+b, 0);
+    for (let i = 0; i < 7; i++) {
+      const percentage = (avgWorkoutsPerDay[i] / totalWorkouts) * 100;
+      const multiplier = avgWorkoutsPerDay[i] / weeklyMean;
+
+      if (percentage > 30 || multiplier > 1.5) {
+        patterns.push(`🎯 ${weekdayNames[i]} peak (${percentage.toFixed(0)}% of workouts)`);
+        break;  // Only show one peak day
+      }
+    }
+
+    // Pattern 3: Mid-week slump (day with <0.6x mean AND significantly lowest)
+    const minDay = avgWorkoutsPerDay.indexOf(Math.min(...avgWorkoutsPerDay));
+    if (avgWorkoutsPerDay[minDay] < weeklyMean * 0.6 && minDay >= 1 && minDay <= 4) {
+      patterns.push(`Mid-week slump on ${weekdayNames[minDay]}`);
+    }
+
+    // Return max 2 patterns
+    return patterns.slice(0, 2);
+  }
+
+  /**
    * Format duration in minutes to human-readable string
    * @param {number} minutes - Duration in minutes
    * @returns {string} Formatted duration (e.g., "1h 30min" or "45 min")
