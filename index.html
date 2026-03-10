@@ -3027,6 +3027,9 @@
       // Fetch activity records
       setProgress(30, "Loading activity data…");
       let activityRecords = await db.activityRecords.toArray();
+      if (!activityRecords) {
+        activityRecords = [];
+      }
 
       // Apply date range filter
       if (cutoffDate) {
@@ -3062,7 +3065,7 @@
       renderWorkoutOverview(filteredRecords, selectedType);
 
       setProgress(70, "Rendering workout heatmap…");
-      renderWorkoutHeatmap(filteredRecords, cutoffDate);
+      await renderWorkoutHeatmap(filteredRecords, cutoffDate);
 
       setProgress(80, "Rendering activity distribution…");
       renderActivityTypeDistribution(filteredRecords);
@@ -3356,9 +3359,14 @@
     });
   }
 
-  // Activity type filter change handler
+  // Activity filter change handlers
   if ($("activityTypeSelect")) {
     $("activityTypeSelect").addEventListener("change", ()=>{
+      renderActivityDashboard().catch(console.error);
+    });
+  }
+  if ($("activityRangeSelect")) {
+    $("activityRangeSelect").addEventListener("change", ()=>{
       renderActivityDashboard().catch(console.error);
     });
   }
