@@ -288,8 +288,10 @@
           <div id="workoutHeatmapChart" class="chart" style="height:400px"></div>
 
           <!-- Activity Type Distribution -->
-          <h3 style="font-size:14px; margin-top:20px; margin-bottom:6px; font-weight:600">Activity Type Distribution</h3>
-          <div id="activityTypeChart" class="chart" style="height:320px"></div>
+          <div id="activityTypeSection">
+            <h3 style="font-size:14px; margin-top:20px; margin-bottom:6px; font-weight:600">Activity Type Distribution</h3>
+            <div id="activityTypeChart" class="chart" style="height:320px"></div>
+          </div>
 
           <!-- Weekly Patterns -->
           <h3 style="font-size:14px; margin-top:20px; margin-bottom:6px; font-weight:600">Weekly Patterns</h3>
@@ -3218,15 +3220,14 @@
 
       // Only show activity type distribution when viewing all types
       // (would just show 100% when filtering to one type)
+      const typeSection = $("activityTypeSection");
       if (selectedType === 'all') {
+        if (typeSection) typeSection.style.display = '';
         setProgress(80, "Rendering activity distribution…");
         renderActivityTypeDistribution(filteredRecords);
       } else {
-        // Hide the distribution chart when filtering
-        const chartEl = $("activityTypeChart");
-        if (chartEl) {
-          chartEl.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#9fb0c3;font-style:italic">Activity type distribution shown only when viewing all activities</div>';
-        }
+        // Hide the entire distribution section when filtering to specific type
+        if (typeSection) typeSection.style.display = 'none';
       }
 
       setProgress(85, "Rendering weekly patterns…");
