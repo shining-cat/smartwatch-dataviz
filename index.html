@@ -530,6 +530,12 @@
           const r = results.data || {};
 
           try {
+            // Debug: Log hiking activities
+            const activityType = r['Activity type'] || r.Type || r.type;
+            if (activityType && activityType.toLowerCase() === 'hiking') {
+              console.log('DEBUG: Found Hiking activity row:', r);
+            }
+
             // Parse timestamps
             const fromRaw = r.from || r.From;
             const toRaw = r.to || r.To;
@@ -538,11 +544,17 @@
 
             // Validate timestamps
             if (!fromDt || !toDt || isNaN(fromDt.getTime()) || isNaN(toDt.getTime())) {
+              if (activityType && activityType.toLowerCase() === 'hiking') {
+                console.error(`DEBUG: Hiking activity REJECTED - Invalid timestamps: from=${fromRaw}, to=${toRaw}`);
+              }
               console.warn(`Invalid timestamps in activities.csv: from=${fromRaw}, to=${toRaw}`);
               return;
             }
 
             if (fromDt >= toDt) {
+              if (activityType && activityType.toLowerCase() === 'hiking') {
+                console.error(`DEBUG: Hiking activity REJECTED - from >= to: ${fromRaw} >= ${toRaw}`);
+              }
               console.warn(`Invalid time range in activities.csv: from >= to (${fromRaw} >= ${toRaw})`);
               return;
             }
@@ -552,6 +564,9 @@
 
             // Validate duration (0 < duration < 1440 minutes = 24 hours)
             if (durationMinutes <= 0 || durationMinutes >= MINUTES_PER_DAY) {
+              if (activityType && activityType.toLowerCase() === 'hiking') {
+                console.error(`DEBUG: Hiking activity REJECTED - Invalid duration: ${durationMinutes} minutes`);
+              }
               console.warn(`Invalid duration in activities.csv: ${durationMinutes} minutes`);
               return;
             }
@@ -621,6 +636,11 @@
               calories: dataObj.calories ? parseFloat(dataObj.calories) : null,
               steps: dataObj.steps ? parseFloat(dataObj.steps) : null
             };
+
+            // Debug: Log successful hiking record
+            if (activityRecord.activityType && activityRecord.activityType.toLowerCase() === 'hiking') {
+              console.log('DEBUG: Hiking activity ACCEPTED:', activityRecord);
+            }
 
             activityRecords.push(activityRecord);
           } catch (e) {
