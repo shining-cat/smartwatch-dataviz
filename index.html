@@ -840,24 +840,15 @@
     let metrics = (m && m.value) ? m.value : [];
     metrics = metrics.filter(x => !String(x).toLowerCase().includes("calories") && !String(x).toLowerCase().includes("manual"));
     const sel = $("metricSelect");
-    const sel2 = $("seasonMetric");
     sel.innerHTML = "";
-    sel2.innerHTML = "";
     for (const metric of metrics){
       const opt = document.createElement("option");
       opt.value = metric; opt.textContent = metric;
       sel.appendChild(opt);
-
-      const opt2 = document.createElement("option");
-      opt2.value = metric; opt2.textContent = metric;
-      sel2.appendChild(opt2);
     }
     const defaults = ["aggregates_steps","sleep_duration_min","weight"];
     for (let i=0;i<sel.options.length;i++){
       if (defaults.includes(sel.options[i].value)) sel.options[i].selected = true;
-    }
-    if (sel2.options.length){
-      sel2.value = defaults.find(d => metrics.includes(d)) || sel2.options[0].value;
     }
   }
 
