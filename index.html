@@ -2810,8 +2810,23 @@
 
     if (!chartContainer) return;
 
-    if (activityRecords.length < 28) {
-      const msg = '<div class="notice">Need at least 4 weeks of data for weekly pattern analysis</div>';
+    // Check if we have enough data by date span (not record count)
+    if (activityRecords.length === 0) {
+      const msg = '<div class="notice">No workout data available</div>';
+      if (chartContainer) chartContainer.innerHTML = msg;
+      if (insightsContainer) insightsContainer.innerHTML = '';
+      return;
+    }
+
+    // Calculate date span from earliest to latest activity
+    const dates = activityRecords.map(r => r.date).sort();
+    const earliestDate = new Date(dates[0]);
+    const latestDate = new Date(dates[dates.length - 1]);
+    const daySpan = Math.floor((latestDate - earliestDate) / (1000 * 60 * 60 * 24));
+
+    // Need at least 28 days (4 weeks) of time span for weekly pattern analysis
+    if (daySpan < 28) {
+      const msg = '<div class="notice">Need at least 4 weeks of data for weekly pattern analysis (currently ' + daySpan + ' days)</div>';
       if (chartContainer) chartContainer.innerHTML = msg;
       if (insightsContainer) insightsContainer.innerHTML = '';
       return;
