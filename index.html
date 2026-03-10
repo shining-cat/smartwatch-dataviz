@@ -437,7 +437,6 @@
     setStatus("no data loaded");
     $("kpis").style.display = "none";
     $("metricSelect").innerHTML = "";
-    $("seasonMetric").innerHTML = "";
     log("Wiped IndexedDB storage.");
   }
 
@@ -969,104 +968,6 @@
     }, true);
   }
 
-  async function renderSeasonality(){
-    ensureCharts();
-    $("chart2").style.display = "";
-    const metric = $("seasonMetric").value;
-    if (!metric){ chart.clear(); chart2.clear(); return; }
-
-    setProgress(100, "Rendering seasonality…");
-    log(`Rendering weekly seasonality for ${metric}`);
-
-    const { dates, values, overridden } = await fetchDailySeries(metric);
-    if (!dates.length){ chart.clear(); chart2.clear(); return; }
-
-    // Choose a readable window (many years makes each cell tiny)
-    const rangeMode = ($("seasonRange") && $("seasonRange").value) ? $("seasonRange").value : "2y";
-    const end = dates[dates.length - 1];
-    let start = dates[0];
-
-    function addDays(iso, delta){
-      const d = new Date(iso + "T00:00:00");
-      d.setDate(d.getDate() + delta);
-      const yyyy = d.getFullYear();
-      const mm = String(d.getMonth()+1).padStart(2,"0");
-      const dd = String(d.getDate()).padStart(2,"0");
-      return `${yyyy}-${mm}-${dd}`;
-    }
-    function daysBetween(a,b){
-      const da = new Date(a+"T00:00:00");
-      const db = new Date(b+"T00:00:00");
-      return Math.max(1, Math.round((db-da)/86400000));
-    }
-
-    if (rangeMode === "1y") start = addDays(end, -365);
-    else if (rangeMode === "2y") start = addDays(end, -730);
-
-    // Filter to selected date window
-    const calData = [];
-    const wdBuckets = Array.from({length:7}, ()=>({sum:0,n:0}));
-    for (let i=0;i<dates.length;i++){
-      const d = dates[i];
-      if (d < start || d > end) continue;
-      const v = values[i];
-      calData.push([d, v]);
-
-      const dt = new Date(d + "T00:00:00");
-      const wd = (dt.getDay() + 6) % 7; // Mon..Sun
-      wdBuckets[wd].sum += v;
-      wdBuckets[wd].n += 1;
-    }
-
-    if (!calData.length){
-      chart.clear(); chart2.clear();
-      return;
-    }
-
-    const wdNames = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
-    const wdVals = wdBuckets.map(x=> x.n ? x.sum/x.n : 0);
-
-    const valsInRange = calData.map(x=>x[1]);
-    const min = Math.min(...valsInRange), max = Math.max(...valsInRange);
-
-    // Dynamic cell size so the calendar isn't a thin stripe.
-    // Approx weeks in range → choose a cell width that fits chart width.
-    const totalDays = daysBetween(start, end);
-    const weeks = Math.ceil(totalDays / 7);
-    const w = chart.getWidth ? chart.getWidth() : 900;
-    const usableW = Math.max(300, w - 110);
-    const cell = Math.max(10, Math.min(20, Math.floor(usableW / weeks)));
-
-    chart.setOption({
-      tooltip:{ position:"top" },
-      visualMap:{
-        min, max, calculable:true,
-        orient:"horizontal",
-        left:"center", bottom: 8,
-        textStyle:{ color:"#9fb0c3" }
-      },
-      title:{ text:`Calendar heatmap: ${metric}`, left:"center", top:6, textStyle:{ color:"#e7eef7", fontSize:14 } },
-      calendar:{
-        top: 50, left: 30, right: 20, bottom: 55,
-        cellSize:[cell, cell],
-        range:[start, end],
-        itemStyle:{ borderWidth:0.5, borderColor:"#1f2a3a" },
-        yearLabel:{ color:"#9fb0c3" },
-        monthLabel:{ color:"#9fb0c3" },
-        dayLabel:{ color:"#9fb0c3" }
-      },
-      series:[{ type:"heatmap", coordinateSystem:"calendar", data: calData }]
-    }, true);
-
-    chart2.setOption({
-      title:{ text:`Weekday averages: ${metric}`, left:"center", top:8, textStyle:{ color:"#e7eef7", fontSize:14 } },
-      grid:{ left:55, right:20, top:45, bottom:45 },
-      tooltip:{ trigger:"axis" },
-      xAxis:{ type:"category", data: wdNames, axisLabel:{ color:"#9fb0c3" }, axisLine:{ lineStyle:{ color:"#223046" } } },
-      yAxis:{ type:"value", axisLabel:{ color:"#9fb0c3" }, splitLine:{ lineStyle:{ color:"#1f2a3a" } } },
-      series:[{ type:"bar", data: wdVals }]
-    }, true);
-  }
 
   // --------------------------
   // Editing (overrides)
