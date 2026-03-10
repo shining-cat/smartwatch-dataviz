@@ -2867,6 +2867,139 @@
     setTimeout(()=>{ try{ window.workoutWeeklyPatternChart.resize(); }catch(e){} }, 0);
   }
 
+  function renderDistanceElevation(activityRecords, selectedType) {
+    const section = $("distanceElevationSection");
+    if (!section) return;
+
+    // Check if selected type has distance/elevation data
+    const distanceTypes = ['Walking', 'Hiking', 'Cycling', 'Running'];
+    const shouldShow = selectedType !== 'all' && distanceTypes.includes(selectedType);
+
+    if (!shouldShow) {
+      section.style.display = 'none';
+      return;
+    }
+
+    // Filter records with distance/elevation data
+    const withDistance = activityRecords.filter(r => r.distance != null);
+    const withElevation = activityRecords.filter(r => r.elevation != null);
+
+    if (withDistance.length === 0 && withElevation.length === 0) {
+      section.style.display = 'none';
+      return;
+    }
+
+    section.style.display = '';
+
+    // Distance chart
+    if (withDistance.length > 0) {
+      const distanceEl = $("distanceChart");
+      if (distanceEl) {
+        if (!window.distanceChart) {
+          window.distanceChart = echarts.init(distanceEl, null, { renderer:"canvas" });
+          window.addEventListener("resize", ()=>{ try{ window.distanceChart.resize(); }catch(e){} });
+        }
+
+        const sorted = withDistance.slice().sort((a,b) => a.date.localeCompare(b.date));
+        const distanceData = sorted.map(r => [r.date, (r.distance / 1000).toFixed(2)]); // km
+
+        window.distanceChart.setOption({
+          tooltip:{
+            trigger: "axis",
+            formatter: (params) => {
+              const p = params[0];
+              return `${p.data[0]}<br/>Distance: ${p.data[1]} km`;
+            }
+          },
+          xAxis:{ type: "time", axisLabel:{ color:"#9fb0c3" } },
+          yAxis:{ type: "value", axisLabel:{ color:"#9fb0c3", formatter:(v)=>`${v} km` } },
+          series:[{
+            type: "scatter",
+            data: distanceData,
+            itemStyle: { color: "#3aa0ff" }
+          }]
+        }, true);
+      }
+    }
+
+    // Elevation chart
+    if (withElevation.length > 0) {
+      const elevationEl = $("elevationChart");
+      if (elevationEl) {
+        if (!window.elevationChart) {
+          window.elevationChart = echarts.init(elevationEl, null, { renderer:"canvas" });
+          window.addEventListener("resize", ()=>{ try{ window.elevationChart.resize(); }catch(e){} });
+        }
+
+        const sorted = withElevation.slice().sort((a,b) => a.date.localeCompare(b.date));
+        const elevationData = sorted.map(r => [r.date, r.elevation]); // meters
+
+        window.elevationChart.setOption({
+          tooltip:{
+            trigger: "axis",
+            formatter: (params) => {
+              const p = params[0];
+              return `${p.data[0]}<br/>Elevation: ${p.data[1]} m`;
+            }
+          },
+          xAxis:{ type: "time", axisLabel:{ color:"#9fb0c3" } },
+          yAxis:{ type: "value", axisLabel:{ color:"#9fb0c3", formatter:(v)=>`${v} m` } },
+          series:[{
+            type: "scatter",
+            data: elevationData,
+            itemStyle: { color: "#3dce79" }
+          }]
+        }, true);
+      }
+    }
+
+    // Stats cards
+    const cardsContainer = $("distanceElevationCards");
+    if (cardsContainer) {
+      cardsContainer.innerHTML = "";
+      cardsContainer.style.display = "flex";
+      cardsContainer.style.gap = "12px";
+      cardsContainer.style.flexWrap = "wrap";
+
+      function mk(label, value, tooltip) {
+        const card = document.createElement("div");
+        card.className = "insight-card";
+        if (tooltip) card.title = tooltip;
+        card.innerHTML = `
+          <div style="font-size:12px;color:#9fb0c3;">${label}</div>
+          <div style="font-size:24px;font-weight:700;margin-top:4px">${value}</div>
+        `;
+        return card;
+      }
+
+      if (withDistance.length > 0) {
+        const distances = withDistance.map(r => r.distance / 1000); // km
+        const avgDist = distances.reduce((a,b)=>a+b,0) / distances.length;
+        const totalDist = distances.reduce((a,b)=>a+b,0);
+
+        cardsContainer.appendChild(mk("Avg distance", `${avgDist.toFixed(1)} km`, `Average distance per ${selectedType} session`));
+        cardsContainer.appendChild(mk("Total distance", `${totalDist.toFixed(0)} km`, `Total distance in selected range`));
+      }
+
+      if (withElevation.length > 0) {
+        const elevations = withElevation.map(r => r.elevation);
+        const avgElev = elevations.reduce((a,b)=>a+b,0) / elevations.length;
+        const maxElev = Math.max(...elevations);
+        const maxDate = withElevation.find(r => r.elevation === maxElev).date;
+
+        cardsContainer.appendChild(mk("Avg elevation", `${Math.round(avgElev)} m`, `Average elevation gain per ${selectedType} session`));
+        cardsContainer.appendChild(mk("Highest elevation", `${Math.round(maxElev)} m`, `On ${maxDate}`));
+      }
+    }
+
+    setTimeout(()=>{
+      try {
+        window.distanceChart?.resize();
+        window.elevationChart?.resize();
+      } catch(e){}
+    }, 0);
+  }
+
   async function renderSleepDashboard(){
     setProgress(20, "Rendering sleep dashboard…");
 
