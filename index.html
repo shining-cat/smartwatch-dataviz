@@ -175,7 +175,6 @@
                   <option value="2y">Last 2 years</option>
                   <option value="all" selected>All time</option>
                 </select>
-                <button id="renderActivityBtn" title="Render activity charts">Render activity</button>
               </div>
             </div>
             <div class="muted" style="margin-top:6px">
@@ -3518,11 +3517,6 @@
   if ($("tabSleep")) $("tabSleep").addEventListener("click", ()=>setTab("sleep"));
   if ($("tabActivity")) $("tabActivity").addEventListener("click", ()=>setTab("activity"));
   if ($("renderSleepBtn")) $("renderSleepBtn").addEventListener("click", ()=>renderSleepDashboard().catch(console.error));
-  if ($("renderActivityBtn")) {
-    $("renderActivityBtn").addEventListener("click", ()=>{
-      renderActivityDashboard().catch(console.error);
-    });
-  }
 
   // Activity filter change handlers
   if ($("activityTypeSelect")) {
