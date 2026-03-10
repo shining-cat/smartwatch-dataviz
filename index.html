@@ -3197,6 +3197,19 @@
       }
     }
 
+    // Detect and display patterns
+    const patterns = detectWeeklyPatterns(avgWorkoutsPerDay, weekdayNames);
+    const patternsContainer = $("workoutWeeklyInsights");
+
+    if (patternsContainer) {
+      if (patterns.length > 0) {
+        patternsContainer.innerHTML = patterns.join(' • ');
+        patternsContainer.style.display = '';
+      } else {
+        patternsContainer.style.display = 'none';
+      }
+    }
+
     setTimeout(()=>{ try{ window.workoutWeeklyPatternChart.resize(); }catch(e){} }, 0);
   }
 
