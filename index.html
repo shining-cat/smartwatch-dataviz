@@ -2345,6 +2345,152 @@
     }, 0);
   }
 
+  /**
+   * Calculate workout statistics from activity records
+   * @param {Array} activityRecords - Array of activity records
+   * @returns {Object} Statistics object with workoutsPerWeek, currentStreak, longestGap, avgDuration, sessionCount
+   */
+  function calculateWorkoutStats(activityRecords) {
+    if (!activityRecords || activityRecords.length === 0) {
+      return {
+        workoutsPerWeek: 0,
+        currentStreak: 0,
+        longestGap: 0,
+        avgDuration: 0,
+        sessionCount: 0
+      };
+    }
+
+    // Sort by date
+    const sorted = [...activityRecords].sort((a, b) => a.date.localeCompare(b.date));
+    const sessionCount = sorted.length;
+
+    // Workouts per week (last 30 days)
+    const now = new Date();
+    const thirtyDaysAgo = new Date(now);
+    thirtyDaysAgo.setDate(now.getDate() - 30);
+    const thirtyDaysAgoStr = thirtyDaysAgo.toISOString().split('T')[0];
+    const recentWorkouts = sorted.filter(r => r.date >= thirtyDaysAgoStr);
+    const workoutsPerWeek = (recentWorkouts.length / 30) * 7;
+
+    // Current streak (consecutive weeks with ≥1 workout)
+    let currentStreak = 0;
+    const weekMs = 7 * 24 * 60 * 60 * 1000;
+    let checkDate = new Date(now);
+    checkDate.setHours(0, 0, 0, 0);
+
+    while (true) {
+      const weekStart = new Date(checkDate.getTime() - weekMs);
+      const weekStartStr = weekStart.toISOString().split('T')[0];
+      const weekEndStr = checkDate.toISOString().split('T')[0];
+      const hasWorkout = sorted.some(r => r.date >= weekStartStr && r.date < weekEndStr);
+
+      if (!hasWorkout) break;
+      currentStreak++;
+      checkDate = weekStart;
+
+      // Safety limit
+      if (currentStreak > 520) break; // ~10 years
+    }
+
+    // Longest gap between workouts
+    let longestGap = 0;
+    for (let i = 1; i < sorted.length; i++) {
+      const prevDate = new Date(sorted[i-1].date + "T00:00:00");
+      const currDate = new Date(sorted[i].date + "T00:00:00");
+      const gap = Math.round((currDate - prevDate) / (24 * 60 * 60 * 1000));
+      if (gap > longestGap) longestGap = gap;
+    }
+
+    // Average duration
+    const totalDuration = sorted.reduce((sum, r) => sum + (r.duration || 0), 0);
+    const avgDuration = sessionCount > 0 ? totalDuration / sessionCount : 0;
+
+    return {
+      workoutsPerWeek: Math.round(workoutsPerWeek * 10) / 10,
+      currentStreak,
+      longestGap,
+      avgDuration: Math.round(avgDuration),
+      sessionCount
+    };
+  }
+
+  /**
+   * Format duration in minutes to human-readable string
+   * @param {number} minutes - Duration in minutes
+   * @returns {string} Formatted duration (e.g., "1h 30min" or "45 min")
+   */
+  function formatDuration(minutes) {
+    if (!minutes || minutes === 0) return "0 min";
+    const hours = Math.floor(minutes / 60);
+    const mins = Math.round(minutes % 60);
+    if (hours > 0 && mins > 0) return `${hours}h ${mins}min`;
+    if (hours > 0) return `${hours}h`;
+    return `${mins} min`;
+  }
+
+  /**
+   * Render Workout Overview Cards section
+   * @param {Array} activityRecords - Array of activity records
+   * @param {string} selectedType - Selected activity type ("all" or specific type)
+   */
+  function renderWorkoutOverview(activityRecords, selectedType) {
+    const cardsEl = $("workoutOverviewCards");
+    if (!cardsEl) return;
+
+    cardsEl.innerHTML = "";
+
+    // Filter by type if not "all"
+    let filteredRecords = activityRecords;
+    if (selectedType && selectedType !== "all") {
+      filteredRecords = activityRecords.filter(r => r.type === selectedType);
+    }
+
+    if (filteredRecords.length === 0) {
+      cardsEl.innerHTML = '<div class="notice">No workout data available for selected type</div>';
+      return;
+    }
+
+    // Helper to create insight cards
+    const mk = (title, main, sub, tooltip) => {
+      const d = document.createElement("div");
+      d.className = "insight-card";
+      if (tooltip) d.title = tooltip;
+      d.innerHTML = `<div style="font-size:12px;color:#9fb0c3;">${title}</div>
+                     <div style="font-size:18px;font-weight:700;margin-top:6px">${main}</div>
+                     <div class="muted" style="margin-top:6px">${sub}</div>`;
+      return d;
+    };
+
+    const stats = calculateWorkoutStats(filteredRecords);
+
+    if (selectedType === "all") {
+      // Overview for all workouts
+      cardsEl.appendChild(mk("Workouts/week (30d)", stats.workoutsPerWeek.toFixed(1), "Average weekly workouts", "Number of workouts per week over the last 30 days"));
+      cardsEl.appendChild(mk("Current streak", `${stats.currentStreak} week${stats.currentStreak !== 1 ? 's' : ''}`, "Consecutive weeks active", "Number of consecutive weeks with at least one workout"));
+      cardsEl.appendChild(mk("Longest gap", `${stats.longestGap} day${stats.longestGap !== 1 ? 's' : ''}`, "Between workouts", "Longest period without a workout"));
+      cardsEl.appendChild(mk("Avg duration", formatDuration(stats.avgDuration), "Per workout session", "Average workout duration across all sessions"));
+    } else {
+      // Type-specific overview
+      cardsEl.appendChild(mk("Total sessions", stats.sessionCount.toString(), `${selectedType} workouts`, `Total number of ${selectedType} workout sessions`));
+      cardsEl.appendChild(mk("Avg duration", formatDuration(stats.avgDuration), "Per session", `Average duration for ${selectedType} workouts`));
+
+      // Average distance (if available)
+      const withDistance = filteredRecords.filter(r => r.distance != null && r.distance > 0);
+      if (withDistance.length > 0) {
+        const avgDistance = withDistance.reduce((sum, r) => sum + r.distance, 0) / withDistance.length;
+        cardsEl.appendChild(mk("Avg distance", `${(avgDistance / 1000).toFixed(2)} km`, "Per session", `Average distance for ${selectedType} workouts`));
+      }
+
+      // Average elevation gain (if available)
+      const withElevation = filteredRecords.filter(r => r.elevationGain != null && r.elevationGain > 0);
+      if (withElevation.length > 0) {
+        const avgElevation = withElevation.reduce((sum, r) => sum + r.elevationGain, 0) / withElevation.length;
+        cardsEl.appendChild(mk("Avg elevation gain", `${Math.round(avgElevation)} m`, "Per session", `Average elevation gain for ${selectedType} workouts`));
+      }
+    }
+  }
+
   async function renderSleepDashboard(){
     setProgress(20, "Rendering sleep dashboard…");
 
