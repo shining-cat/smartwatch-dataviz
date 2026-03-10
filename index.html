@@ -428,6 +428,15 @@
     activityRecords: "date, activityType, from"
   });
 
+  // v5 fixes activityRecords primary key (was losing activities on same date)
+  db.version(5).stores({
+    daily: "[metric+date], metric, date",
+    meta: "key",
+    overrides: "[metric+date], metric, date",
+    sleepRecords: "date, from, to",
+    activityRecords: "++id, date, activityType, from"
+  });
+
   async function wipeStorage(){
     await db.daily.clear();
     await db.meta.clear();
