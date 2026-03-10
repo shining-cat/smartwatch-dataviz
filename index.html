@@ -2125,7 +2125,7 @@
    */
   async function fetchStepAggregates() {
     try {
-      const records = await db.daily.where('metricName').equals('aggregates_steps').toArray();
+      const records = await db.daily.where('metric').equals('aggregates_steps').toArray();
       return records.map(r => ({
         date: r.date,
         steps: r.value
