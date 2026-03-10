@@ -650,8 +650,21 @@
         complete: async () => {
           try {
             if (activityRecords.length > 0 && db.activityRecords) {
+              // Debug: Count hiking activities before bulkPut
+              const hikingCount = activityRecords.filter(r => r.activityType && r.activityType.toLowerCase() === 'hiking').length;
+              console.log(`DEBUG: About to store ${activityRecords.length} total records, including ${hikingCount} Hiking activities`);
+
               await db.activityRecords.bulkPut(activityRecords);
               console.log(`Stored ${activityRecords.length} activity records`);
+
+              // Debug: Verify hiking activities in database
+              const dbHikingCount = await db.activityRecords.where('activityType').equals('Hiking').count();
+              console.log(`DEBUG: After bulkPut, database contains ${dbHikingCount} Hiking activities`);
+
+              // Debug: Check all activity types in database
+              const allRecords = await db.activityRecords.toArray();
+              const types = new Set(allRecords.map(r => r.activityType));
+              console.log(`DEBUG: Activity types in database:`, Array.from(types).sort());
             }
             resolve();
           } catch (e) {
