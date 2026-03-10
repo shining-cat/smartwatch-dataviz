@@ -2142,6 +2142,16 @@
    * @param {Date} cutoffDate - Optional date range filter
    */
   async function renderDailySteps(stepData, cutoffDate) {
+    // Check if ECharts is loaded
+    if (typeof echarts === 'undefined') {
+      console.error('ECharts library not loaded');
+      const chart1 = $("stepsTimeSeriesChart");
+      const chart2 = $("stepsWeeklyChart");
+      if (chart1) chart1.innerHTML = '<div class="notice">Chart library not available</div>';
+      if (chart2) chart2.innerHTML = '<div class="notice">Chart library not available</div>';
+      return;
+    }
+
     // Apply date range filter
     if (cutoffDate) {
       const cutoffStr = cutoffDate.toISOString().split('T')[0];
@@ -2186,6 +2196,17 @@
       }
 
       const series = dates.map((d,i)=>[d, values[i]]);
+
+      // Validate chart is still valid before using
+      if (!window.stepsTimeSeriesChart || typeof window.stepsTimeSeriesChart.setOption !== 'function') {
+        console.error('Steps time series chart became invalid, re-initializing...');
+        window.stepsTimeSeriesChart = echarts.init(tsEl, null, { renderer:"canvas" });
+        if (!window.stepsTimeSeriesChart || typeof window.stepsTimeSeriesChart.setOption !== 'function') {
+          console.error('Failed to re-initialize steps time series chart');
+          tsEl.innerHTML = '<div class="notice">Chart initialization failed</div>';
+          return;
+        }
+      }
 
       window.stepsTimeSeriesChart.setOption({
         tooltip:{ trigger:"axis", formatter: (params)=> {
@@ -2238,6 +2259,17 @@
         if (deviation < -0.1) return { color: '#ff5a6b' }; // red
         return { color: '#3aa0ff' }; // blue
       });
+
+      // Validate chart is still valid before using
+      if (!window.stepsWeeklyChart || typeof window.stepsWeeklyChart.setOption !== 'function') {
+        console.error('Steps weekly chart became invalid, re-initializing...');
+        window.stepsWeeklyChart = echarts.init(weeklyEl, null, { renderer:"canvas" });
+        if (!window.stepsWeeklyChart || typeof window.stepsWeeklyChart.setOption !== 'function') {
+          console.error('Failed to re-initialize steps weekly chart');
+          weeklyEl.innerHTML = '<div class="notice">Chart initialization failed</div>';
+          return;
+        }
+      }
 
       window.stepsWeeklyChart.setOption({
         tooltip:{ trigger:"axis", formatter:(params)=>{
