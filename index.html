@@ -528,10 +528,22 @@
     await computeAndStoreMeta();
     setProgress(100, "Done. Rendering default views…");
     log("Ingestion complete.");
+
+    // Populate activity type dropdown immediately
+    await populateActivityTypeDropdown();
+
     try {
       const metrics = await db.daily.orderBy("metric").uniqueKeys();
       const hasSleep = metrics && metrics.some(k => (""+k).startsWith("sleep_"));
-      if (hasSleep) { log("Auto-opening Sleep tab."); setTab("sleep"); }
+      const hasActivities = await db.activityRecords.count() > 0;
+
+      if (hasSleep) {
+        log("Auto-opening Sleep tab.");
+        setTab("sleep");
+      } else if (hasActivities) {
+        log("Auto-opening Activity tab.");
+        setTab("activity");
+      }
     } catch(e){ console.error(e); }
     await refreshMetricPickersFromDB();
     await renderDefault();
@@ -923,7 +935,19 @@
     }
   }
 
-  async function renderDefault(){ await renderTimeline(); }
+  async function renderDefault(){
+    await renderTimeline();
+    // Also render sleep/activity if data exists (for initial load)
+    try {
+      const sleepCount = await db.sleepRecords.count();
+      if (sleepCount > 0) await renderSleepDashboard();
+
+      const activityCount = await db.activityRecords.count();
+      if (activityCount > 0) await renderActivityDashboard();
+    } catch(e) {
+      console.error('Error in renderDefault:', e);
+    }
+  }
 
   function rollingAverage(values, window=7){
     const out = []; let sum=0; const q=[];
@@ -3103,6 +3127,40 @@
     }, 0);
   }
 
+  /**
+   * Populate activity type dropdown from database
+   */
+  async function populateActivityTypeDropdown() {
+    const typeSelect = $("activityTypeSelect");
+    if (!typeSelect) return;
+
+    try {
+      const allRecords = await db.activityRecords.toArray();
+      if (allRecords.length === 0) return;
+
+      // Get unique activity types
+      const types = new Set(allRecords.map(r => r.activityType));
+      const sortedTypes = Array.from(types).sort();
+
+      // Keep "All Activities" option, remove old type options
+      while (typeSelect.options.length > 1) {
+        typeSelect.remove(1);
+      }
+
+      // Add activity type options
+      sortedTypes.forEach(type => {
+        const opt = document.createElement('option');
+        opt.value = type;
+        opt.textContent = type;
+        typeSelect.appendChild(opt);
+      });
+
+      console.log(`Populated activity type dropdown with ${sortedTypes.length} types`);
+    } catch (e) {
+      console.error('Failed to populate activity type dropdown:', e);
+    }
+  }
+
   async function renderActivityDashboard() {
     setProgress(20, "Rendering activity dashboard…");
 
@@ -3146,18 +3204,6 @@
         filteredRecords = activityRecords.filter(r => r.activityType === selectedType);
       }
 
-      // Populate activity type dropdown
-      if (typeSelect && typeSelect.options.length === 1) {
-        const types = new Set(activityRecords.map(r => r.activityType));
-        const sortedTypes = Array.from(types).sort();
-        sortedTypes.forEach(type => {
-          const opt = document.createElement('option');
-          opt.value = type;
-          opt.textContent = type;
-          typeSelect.appendChild(opt);
-        });
-      }
-
       // Section 1: Daily Steps
       setProgress(40, "Rendering daily steps…");
       const stepData = await fetchStepAggregates();
@@ -3170,8 +3216,18 @@
       setProgress(70, "Rendering workout heatmap…");
       await renderWorkoutHeatmap(filteredRecords, cutoffDate);
 
-      setProgress(80, "Rendering activity distribution…");
-      renderActivityTypeDistribution(filteredRecords);
+      // Only show activity type distribution when viewing all types
+      // (would just show 100% when filtering to one type)
+      if (selectedType === 'all') {
+        setProgress(80, "Rendering activity distribution…");
+        renderActivityTypeDistribution(filteredRecords);
+      } else {
+        // Hide the distribution chart when filtering
+        const chartEl = $("activityTypeChart");
+        if (chartEl) {
+          chartEl.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#9fb0c3;font-style:italic">Activity type distribution shown only when viewing all activities</div>';
+        }
+      }
 
       setProgress(85, "Rendering weekly patterns…");
       renderWorkoutWeeklyPatterns(filteredRecords);
@@ -3449,7 +3505,8 @@
     } else if (isActivity){
       $("chart").style.display = "none";
       $("chart2").style.display = "none";
-      // Activity tab doesn't auto-render, user clicks "Render Activity Charts" button
+      // Auto-render Activity tab (like Sleep tab)
+      renderActivityDashboard().catch(console.error);
     }
   }
   $("tabTimeline").addEventListener("click", ()=>setTab("timeline"));
