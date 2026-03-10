@@ -397,8 +397,8 @@
   // Constants
   const MS_PER_MINUTE = 60000;
   const MINUTES_PER_DAY = 1440;
-  const HR_MIN_BPM = 30;
-  const HR_MAX_BPM = 200;
+  const HR_MIN_BPM = 20;  // Allow low values for sensor glitches/rest
+  const HR_MAX_BPM = 250; // Allow high values for intense athletic activity
 
   // IndexedDB
   const db = new Dexie("withingsLocalViz");
@@ -570,38 +570,39 @@
               }
             }
 
-            // Extract and validate optional fields
-            const hrAverage = dataObj.hr_average ? parseFloat(dataObj.hr_average) : null;
-            const hrMin = dataObj.hr_min ? parseFloat(dataObj.hr_min) : null;
-            const hrMax = dataObj.hr_max ? parseFloat(dataObj.hr_max) : null;
-            const distance = dataObj.distance ? parseFloat(dataObj.distance) : null;
-            const elevation = dataObj.elevation ? parseFloat(dataObj.elevation) : null;
+            // Extract and sanitize optional fields
+            // HR: Accept 0-300 bpm, set to null if outside range (sensor errors or extreme values)
+            let hrAverage = dataObj.hr_average ? parseFloat(dataObj.hr_average) : null;
+            let hrMin = dataObj.hr_min ? parseFloat(dataObj.hr_min) : null;
+            let hrMax = dataObj.hr_max ? parseFloat(dataObj.hr_max) : null;
+            let distance = dataObj.distance ? parseFloat(dataObj.distance) : null;
+            let elevation = dataObj.elevation ? parseFloat(dataObj.elevation) : null;
 
-            // Validate HR if present (30-200 bpm)
-            if (hrAverage !== null && (isNaN(hrAverage) || hrAverage < HR_MIN_BPM || hrAverage > HR_MAX_BPM)) {
-              console.warn(`Invalid heart rate in activities.csv: ${hrAverage}`);
-              return;
+            // Sanitize HR values - set to null if invalid, but keep the activity
+            if (hrAverage !== null && (isNaN(hrAverage) || hrAverage < 0 || hrAverage > 300)) {
+              console.warn(`Sanitizing invalid HR average: ${hrAverage} → null`);
+              hrAverage = null;
             }
 
-            if (hrMin !== null && (isNaN(hrMin) || hrMin < HR_MIN_BPM || hrMin > HR_MAX_BPM)) {
-              console.warn(`Invalid heart rate min in activities.csv: ${hrMin}`);
-              return;
+            if (hrMin !== null && (isNaN(hrMin) || hrMin < 0 || hrMin > 300)) {
+              console.warn(`Sanitizing invalid HR min: ${hrMin} → null`);
+              hrMin = null;
             }
 
-            if (hrMax !== null && (isNaN(hrMax) || hrMax < HR_MIN_BPM || hrMax > HR_MAX_BPM)) {
-              console.warn(`Invalid heart rate max in activities.csv: ${hrMax}`);
-              return;
+            if (hrMax !== null && (isNaN(hrMax) || hrMax < 0 || hrMax > 300)) {
+              console.warn(`Sanitizing invalid HR max: ${hrMax} → null`);
+              hrMax = null;
             }
 
-            // Validate distance/elevation if present (>= 0)
+            // Sanitize distance/elevation - set to null if invalid
             if (distance !== null && (isNaN(distance) || distance < 0)) {
-              console.warn(`Invalid distance in activities.csv: ${distance}`);
-              return;
+              console.warn(`Sanitizing invalid distance: ${distance} → null`);
+              distance = null;
             }
 
             if (elevation !== null && (isNaN(elevation) || elevation < 0)) {
-              console.warn(`Invalid elevation in activities.csv: ${elevation}`);
-              return;
+              console.warn(`Sanitizing invalid elevation: ${elevation} → null`);
+              elevation = null;
             }
 
             // Create activity record
