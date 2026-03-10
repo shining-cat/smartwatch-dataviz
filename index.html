@@ -3000,6 +3000,87 @@
     }, 0);
   }
 
+  async function renderActivityDashboard() {
+    setProgress(20, "Rendering activity dashboard…");
+
+    // Get filters
+    const typeSelect = $("activityTypeSelect");
+    const rangeSelect = $("activityRangeSelect");
+    const selectedType = typeSelect ? typeSelect.value : 'all';
+    const selectedRange = rangeSelect ? rangeSelect.value : 'all';
+
+    // Calculate cutoff date
+    let cutoffDate = null;
+    if (selectedRange !== 'all') {
+      const now = new Date();
+      cutoffDate = new Date(now);
+      switch(selectedRange) {
+        case '1m': cutoffDate.setMonth(now.getMonth() - 1); break;
+        case '3m': cutoffDate.setMonth(now.getMonth() - 3); break;
+        case '6m': cutoffDate.setMonth(now.getMonth() - 6); break;
+        case '1y': cutoffDate.setFullYear(now.getFullYear() - 1); break;
+        case '2y': cutoffDate.setFullYear(now.getFullYear() - 2); break;
+      }
+    }
+
+    try {
+      // Fetch activity records
+      setProgress(30, "Loading activity data…");
+      let activityRecords = await db.activityRecords.toArray();
+
+      // Apply date range filter
+      if (cutoffDate) {
+        const cutoffStr = cutoffDate.toISOString().split('T')[0];
+        activityRecords = activityRecords.filter(r => r.date >= cutoffStr);
+      }
+
+      // Apply activity type filter
+      let filteredRecords = activityRecords;
+      if (selectedType !== 'all') {
+        filteredRecords = activityRecords.filter(r => r.activityType === selectedType);
+      }
+
+      // Populate activity type dropdown
+      if (typeSelect && typeSelect.options.length === 1) {
+        const types = new Set(activityRecords.map(r => r.activityType));
+        const sortedTypes = Array.from(types).sort();
+        sortedTypes.forEach(type => {
+          const opt = document.createElement('option');
+          opt.value = type;
+          opt.textContent = type;
+          typeSelect.appendChild(opt);
+        });
+      }
+
+      // Section 1: Daily Steps
+      setProgress(40, "Rendering daily steps…");
+      const stepData = await fetchStepAggregates();
+      await renderDailySteps(stepData, cutoffDate);
+
+      // Section 2: Workout Habits
+      setProgress(60, "Rendering workout overview…");
+      renderWorkoutOverview(filteredRecords, selectedType);
+
+      setProgress(70, "Rendering workout heatmap…");
+      renderWorkoutHeatmap(filteredRecords, cutoffDate);
+
+      setProgress(80, "Rendering activity distribution…");
+      renderActivityTypeDistribution(filteredRecords);
+
+      setProgress(85, "Rendering weekly patterns…");
+      renderWorkoutWeeklyPatterns(filteredRecords);
+
+      // Section 3: Distance/Elevation (conditional)
+      setProgress(90, "Rendering distance/elevation…");
+      renderDistanceElevation(filteredRecords, selectedType);
+
+      setProgress(100, "Activity dashboard ready");
+    } catch (error) {
+      console.error("Activity dashboard error:", error);
+      setProgress(0, "Failed to render activity dashboard");
+    }
+  }
+
   async function renderSleepDashboard(){
     setProgress(20, "Rendering sleep dashboard…");
 
@@ -3269,6 +3350,18 @@
   if ($("tabSleep")) $("tabSleep").addEventListener("click", ()=>setTab("sleep"));
   if ($("tabActivity")) $("tabActivity").addEventListener("click", ()=>setTab("activity"));
   if ($("renderSleepBtn")) $("renderSleepBtn").addEventListener("click", ()=>renderSleepDashboard().catch(console.error));
+  if ($("renderActivityBtn")) {
+    $("renderActivityBtn").addEventListener("click", ()=>{
+      renderActivityDashboard().catch(console.error);
+    });
+  }
+
+  // Activity type filter change handler
+  if ($("activityTypeSelect")) {
+    $("activityTypeSelect").addEventListener("change", ()=>{
+      renderActivityDashboard().catch(console.error);
+    });
+  }
   $("renderTimelineBtn").addEventListener("click", ()=>renderTimeline().catch(console.error));
   $("wipeBtn").addEventListener("click", ()=>wipeStorage().catch(console.error));
 
