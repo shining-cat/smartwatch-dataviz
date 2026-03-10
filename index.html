@@ -2491,6 +2491,157 @@
     }
   }
 
+  /**
+   * Renders workout calendar heatmap showing workout density over time.
+   * @param {Array} activityRecords - Array of activity records
+   * @param {Date|null} cutoffDate - Optional date filter (only show records >= cutoffDate)
+   */
+  async function renderWorkoutHeatmap(activityRecords, cutoffDate) {
+    const containerEl = $("workoutHeatmapChart");
+    if (!containerEl) {
+      console.warn("Workout heatmap container not found");
+      return;
+    }
+
+    // Filter by cutoff date if provided
+    let filteredRecords = activityRecords;
+    if (cutoffDate) {
+      filteredRecords = activityRecords.filter(r => new Date(r.date) >= cutoffDate);
+    }
+
+    // Handle empty data
+    if (!filteredRecords || filteredRecords.length === 0) {
+      containerEl.innerHTML = '<div style="text-align:center; color:#9fb0c3; padding:40px 20px;">No workout data available for the selected time range.</div>';
+      if (window.workoutHeatmapChart) {
+        window.workoutHeatmapChart.dispose();
+        window.workoutHeatmapChart = null;
+      }
+      return;
+    }
+
+    // Count workouts per day and collect activity details
+    const dailyWorkouts = new Map(); // date -> { count, activities: [{type, duration}] }
+
+    for (const record of filteredRecords) {
+      const date = record.date;
+      if (!dailyWorkouts.has(date)) {
+        dailyWorkouts.set(date, { count: 0, activities: [] });
+      }
+      const dayData = dailyWorkouts.get(date);
+      dayData.count++;
+      dayData.activities.push({
+        type: record.activityType,
+        duration: record.durationMinutes
+      });
+    }
+
+    // Prepare data for ECharts calendar heatmap: [[date, count], ...]
+    const heatmapData = Array.from(dailyWorkouts.entries()).map(([date, data]) => [date, data.count]);
+
+    // Determine date range from data
+    const dates = Array.from(dailyWorkouts.keys()).sort();
+    const startDate = dates[0];
+    const endDate = dates[dates.length - 1];
+
+    // Calculate dynamic cell size based on date range
+    function daysBetween(a, b) {
+      const da = new Date(a + "T00:00:00");
+      const db = new Date(b + "T00:00:00");
+      return Math.max(1, Math.round((db - da) / 86400000));
+    }
+
+    const totalDays = daysBetween(startDate, endDate);
+    const weeks = Math.ceil(totalDays / 7);
+    const containerWidth = containerEl.offsetWidth || 900;
+    const usableWidth = Math.max(300, containerWidth - 110);
+    const cellSize = Math.max(10, Math.min(20, Math.floor(usableWidth / weeks)));
+
+    // Find max workout count for color scale
+    const maxWorkouts = Math.max(...heatmapData.map(d => d[1]));
+
+    // Initialize chart if needed
+    if (!window.workoutHeatmapChart) {
+      try {
+        window.workoutHeatmapChart = echarts.init(containerEl, null, { renderer: "canvas" });
+
+        // Add resize listener
+        const resizeObserver = new ResizeObserver(() => {
+          if (window.workoutHeatmapChart) {
+            try {
+              window.workoutHeatmapChart.resize();
+            } catch (e) {
+              console.warn("Error resizing workout heatmap chart:", e);
+            }
+          }
+        });
+        resizeObserver.observe(containerEl);
+      } catch (e) {
+        console.error("Failed to initialize workout heatmap chart:", e);
+        containerEl.innerHTML = '<div style="text-align:center; color:#ff6b6b; padding:40px 20px;">Error initializing chart</div>';
+        return;
+      }
+    }
+
+    // Render chart
+    window.workoutHeatmapChart.setOption({
+      tooltip: {
+        position: "top",
+        formatter: function(params) {
+          const date = params.data[0];
+          const count = params.data[1];
+          const dayData = dailyWorkouts.get(date);
+
+          let tooltip = `<strong>${count} workout${count !== 1 ? 's' : ''}</strong> on ${date}<br/>`;
+
+          if (dayData && dayData.activities.length > 0) {
+            tooltip += '<div style="margin-top:8px; font-size:12px;">';
+            dayData.activities.forEach(activity => {
+              tooltip += `• ${activity.type}: ${formatDuration(activity.duration)}<br/>`;
+            });
+            tooltip += '</div>';
+          }
+
+          return tooltip;
+        }
+      },
+      visualMap: {
+        min: 0,
+        max: maxWorkouts,
+        calculable: true,
+        orient: "horizontal",
+        left: "center",
+        bottom: 8,
+        inRange: {
+          color: ['#1f2a3a', '#3aa0ff', '#3dce79']
+        },
+        textStyle: { color: "#9fb0c3" }
+      },
+      title: {
+        text: "Workout Calendar",
+        left: "center",
+        top: 6,
+        textStyle: { color: "#e7eef7", fontSize: 14 }
+      },
+      calendar: {
+        top: 50,
+        left: 30,
+        right: 20,
+        bottom: 55,
+        cellSize: [cellSize, cellSize],
+        range: [startDate, endDate],
+        itemStyle: { borderWidth: 0.5, borderColor: "#1f2a3a" },
+        yearLabel: { color: "#9fb0c3" },
+        monthLabel: { color: "#9fb0c3" },
+        dayLabel: { color: "#9fb0c3" }
+      },
+      series: [{
+        type: "heatmap",
+        coordinateSystem: "calendar",
+        data: heatmapData
+      }]
+    }, true);
+  }
+
   async function renderSleepDashboard(){
     setProgress(20, "Rendering sleep dashboard…");
 
