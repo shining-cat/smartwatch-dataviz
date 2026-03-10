@@ -2591,21 +2591,23 @@
 
     // Determine label visibility based on date span
     const years = totalDays / 365;
-    let monthInterval = 0; // 0 = show all
+    let monthNameMap;
 
     if (years > 3) {
-      // >3 years: Show every 12th month (yearly)
-      monthInterval = 11;
+      // >3 years: Show only January each year
+      monthNameMap = ['Jan', null, null, null, null, null, null, null, null, null, null, null];
     } else if (years > 2) {
-      // 2-3 years: Show every 6th month (Jan, Jul)
-      monthInterval = 5;
+      // 2-3 years: Show Jan and Jul
+      monthNameMap = ['Jan', null, null, null, null, null, 'Jul', null, null, null, null, null];
     } else if (years > 1) {
-      // 1-2 years: Show every 3rd month (quarterly)
-      monthInterval = 2;
+      // 1-2 years: Show quarterly
+      monthNameMap = ['Jan', null, null, 'Apr', null, null, 'Jul', null, null, 'Oct', null, null];
+    } else {
+      // <1 year: Show all months
+      monthNameMap = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     }
-    // <1 year: Show all months (interval = 0)
 
-    console.log(`Calendar: ${years.toFixed(1)} years, ${totalDays} days, monthInterval=${monthInterval}`);
+    console.log(`Calendar: ${years.toFixed(1)} years, ${totalDays} days, nameMap strategy=${years > 3 ? 'yearly' : years > 2 ? 'biannual' : years > 1 ? 'quarterly' : 'all'}`);
 
     // Find max workout count for color scale
     const maxWorkouts = Math.max(...heatmapData.map(d => d[1]));
@@ -2687,7 +2689,7 @@
         textStyle: { color: "#9fb0c3" }
       },
       calendar: {
-        top: 10,
+        top: 40,
         left: 30,
         right: 20,
         bottom: 55,
@@ -2703,11 +2705,10 @@
         },
         monthLabel: {
           show: true,
-          fontSize: 11,
-          color: "#8a9aaf",  // Medium visibility
-          interval: monthInterval,  // Control label density
+          fontSize: 13,
+          color: "#9fb0c3",
           margin: 10,
-          formatter: '{MMM}'  // Show 3-letter month abbreviations
+          nameMap: monthNameMap
         },
         dayLabel: {
           fontSize: 10,
