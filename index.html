@@ -429,7 +429,17 @@
   });
 
   // v5 fixes activityRecords primary key (was losing activities on same date)
+  // Must delete and recreate table because Dexie doesn't allow primary key changes
   db.version(5).stores({
+    daily: "[metric+date], metric, date",
+    meta: "key",
+    overrides: "[metric+date], metric, date",
+    sleepRecords: "date, from, to",
+    activityRecords: null  // Delete old table
+  });
+
+  // v6 recreates activityRecords with correct schema
+  db.version(6).stores({
     daily: "[metric+date], metric, date",
     meta: "key",
     overrides: "[metric+date], metric, date",
