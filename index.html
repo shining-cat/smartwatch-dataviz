@@ -60,43 +60,47 @@
   <main>
     <div class="grid">
       <div class="card">
-        <h2>Load data</h2>
-        <div id="drop" class="drop">
-          <strong>Drop your Withings export ZIP here</strong>
-          <div class="muted">or choose a file. Everything stays on this device.</div>
-          <div class="btnrow">
-            <input id="fileInput" type="file" accept=".zip" style="display:none" />
-            <button class="primary" id="chooseBtn">Choose ZIP</button>
-            <button id="reloadBtn" title="Re-render using stored IndexedDB data">Reload from storage</button>
+        <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap">
+          <input id="fileInput" type="file" accept=".zip" style="display:none" />
+          <button class="primary" id="chooseBtn">Choose ZIP</button>
+          <button id="reloadBtn" title="Re-render using stored IndexedDB data">Reload from storage</button>
+          <button id="exportBtn" title="Export your parsed daily dataset + overrides as JSON">Export dataset</button>
+          <button class="danger" id="wipeBtn">Wipe storage</button>
+          <button id="toggleDebugBtn" style="margin-left:auto" title="Show/hide debug details">Debug ▼</button>
+        </div>
+
+        <div id="debugDetails" style="display:none; margin-top:12px">
+          <h2>Load data</h2>
+          <div id="drop" class="drop">
+            <strong>Drop your Withings export ZIP here</strong>
+            <div class="muted">or choose a file. Everything stays on this device.</div>
+          </div>
+
+          <div class="progresswrap">
+            <div class="row" style="justify-content:space-between; margin-top:10px;">
+              <div class="muted" id="progressLabel">Waiting for a ZIP…</div>
+              <div class="muted" id="progressPct">0%</div>
+            </div>
+            <div class="muted" id="lastAction" style="margin-top:6px">Last action: —</div>
+            <div class="bar"><div id="barFill"></div></div>
+            <div class="log" id="log"></div>
+          </div>
+
+          <div class="kpi" id="kpis" style="display:none">
+            <div class="tile"><div class="k">Date range</div><div class="v" id="kpiRange">—</div></div>
+            <div class="tile"><div class="k">Days loaded</div><div class="v" id="kpiDays">—</div></div>
+            <div class="tile"><div class="k">Metrics available</div><div class="v" id="kpiMetrics">—</div></div>
+            <div class="tile"><div class="k">Storage</div><div class="v" id="kpiStorage">IndexedDB</div></div>
+          </div>
+
+          <div class="notice" style="margin-top:10px">
+            MVP reads: <b>aggregates_*.csv</b> (excluding calories/manual), <b>weight.csv</b>, <b>sleep.csv</b>, <b>activities.csv</b>.
+            Raw high-frequency streams are detected but skipped (for now) to keep first load fast.
+          </div>
+
+          <div class="btnrow" style="margin-top:10px">
             <button id="debugRenderBtn" title="Debug: force a timeline render and write to log">Debug render</button>
           </div>
-        </div>
-
-        <div class="progresswrap">
-          <div class="row" style="justify-content:space-between; margin-top:10px;">
-            <div class="muted" id="progressLabel">Waiting for a ZIP…</div>
-            <div class="muted" id="progressPct">0%</div>
-          </div>
-          <div class="muted" id="lastAction" style="margin-top:6px">Last action: —</div>
-          <div class="bar"><div id="barFill"></div></div>
-          <div class="log" id="log"></div>
-        </div>
-
-        <div class="kpi" id="kpis" style="display:none">
-          <div class="tile"><div class="k">Date range</div><div class="v" id="kpiRange">—</div></div>
-          <div class="tile"><div class="k">Days loaded</div><div class="v" id="kpiDays">—</div></div>
-          <div class="tile"><div class="k">Metrics available</div><div class="v" id="kpiMetrics">—</div></div>
-          <div class="tile"><div class="k">Storage</div><div class="v" id="kpiStorage">IndexedDB</div></div>
-        </div>
-
-        <div class="notice" style="margin-top:10px">
-          MVP reads: <b>aggregates_*.csv</b> (excluding calories/manual), <b>weight.csv</b>, <b>sleep.csv</b>, <b>activities.csv</b>.
-          Raw high-frequency streams are detected but skipped (for now) to keep first load fast.
-        </div>
-
-        <div class="btnrow" style="margin-top:10px">
-          <button id="exportBtn" title="Export your parsed daily dataset + overrides as JSON">Export patched dataset</button>
-          <button class="danger" id="wipeBtn">Wipe local storage</button>
         </div>
       </div>
 
@@ -3809,6 +3813,19 @@
   }
   $("renderTimelineBtn").addEventListener("click", ()=>renderTimeline().catch(console.error));
   $("wipeBtn").addEventListener("click", ()=>wipeStorage().catch(console.error));
+
+  // Debug toggle
+  $("toggleDebugBtn").addEventListener("click", ()=>{
+    const debugDetails = $("debugDetails");
+    const btn = $("toggleDebugBtn");
+    if (debugDetails.style.display === "none") {
+      debugDetails.style.display = "";
+      btn.textContent = "Debug ▲";
+    } else {
+      debugDetails.style.display = "none";
+      btn.textContent = "Debug ▼";
+    }
+  });
 
   // File input
   $("chooseBtn").addEventListener("click", ()=>$("fileInput").click());
