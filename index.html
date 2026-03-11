@@ -704,6 +704,18 @@
               await db.activityRecords.bulkPut(activityRecords);
               console.log(`Stored ${activityRecords.length} activity records`);
 
+              // Debug: Show duration distribution
+              const durationBuckets = { '<5min': 0, '5-15min': 0, '15-30min': 0, '30-60min': 0, '>60min': 0 };
+              activityRecords.forEach(r => {
+                const dur = r.durationMinutes;
+                if (dur < 5) durationBuckets['<5min']++;
+                else if (dur < 15) durationBuckets['5-15min']++;
+                else if (dur < 30) durationBuckets['15-30min']++;
+                else if (dur < 60) durationBuckets['30-60min']++;
+                else durationBuckets['>60min']++;
+              });
+              console.log('DEBUG: Duration distribution:', durationBuckets);
+
               // Debug: Verify hiking activities in database
               const dbHikingCount = await db.activityRecords.where('activityType').equals('Hiking').count();
               console.log(`DEBUG: After bulkPut, database contains ${dbHikingCount} Hiking activities`);
