@@ -3748,16 +3748,13 @@
       window.sleepBedChart = echarts.init(bedEl, null, { renderer:"canvas" });
       window.addEventListener("resize", ()=>{ try{ window.sleepBedChart.resize(); }catch(e){} });
     }
-    // Build bedtime data from sleepRecordsForAnalysis with wrapping
-    const pts = [];
-    for (const record of sleepRecordsForAnalysis) {
-      if (!record.from) continue;
-      const fromDate = new Date(record.from);
-      const bedtimeMinutes = fromDate.getHours() * 60 + fromDate.getMinutes();
+    // Use bedtimeData from reaggregateSleepRecords (already filtered and aggregated to one per day)
+    const pts = bedtimeData.dates.map((d, i) => {
+      const bedtimeMinutes = bedtimeData.values[i]; // already in minutes
       const bedtimeHour = bedtimeMinutes / 60;
       const wrappedHour = wrapBedtimeHour(bedtimeHour);
-      pts.push([record.date, wrappedHour]);
-    }
+      return [d, wrappedHour];
+    });
     if (window.sleepBedChart){
       window.sleepBedChart.setOption({
         tooltip:{ formatter:(p)=>{
