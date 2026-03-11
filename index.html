@@ -682,6 +682,10 @@
         complete: async () => {
           try {
             if (activityRecords.length > 0 && db.activityRecords) {
+              // Clear existing records to avoid duplicates on re-ingestion
+              await db.activityRecords.clear();
+              console.log('Cleared existing activity records');
+
               // Debug: Count hiking activities before bulkPut
               const hikingCount = activityRecords.filter(r => r.activityType && r.activityType.toLowerCase() === 'hiking').length;
               console.log(`DEBUG: About to store ${activityRecords.length} total records, including ${hikingCount} Hiking activities`);
