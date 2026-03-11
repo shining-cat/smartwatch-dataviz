@@ -1284,6 +1284,27 @@
   }
 
   /**
+   * Transform bedtime hour to reoriented Y-axis range
+   * @param {number} hour - Hour in 0-24 range (from bedtime minutes / 60)
+   * @returns {number} Hour in 12-36 range for Y-axis display
+   *
+   * Transformation logic:
+   * - If hour < 12 (midnight to noon), add 24 to put it in "next day" section
+   * - This reorients the Y-axis so 12:00 (noon) is at bottom and 11:59 is at top
+   * - Groups bedtime cluster (22:00-02:00) visually together
+   *
+   * Examples:
+   * - Hour 23 (11pm) → 23 (stays as-is)
+   * - Hour 1 (1am) → 25 (wraps forward)
+   * - Hour 6 (6am wake) → 30 (wraps forward)
+   * - Hour 12 (noon) → 12 (boundary, stays as-is)
+   * - Hour 0 (midnight) → 24 (wraps forward)
+   */
+  function wrapBedtimeHour(hour) {
+    return hour < 12 ? hour + 24 : hour;
+  }
+
+  /**
    * Re-aggregate filtered sleep records into daily aggregates
    * This allows nap filtering to affect all dashboard components
    * @param {Array} sleepRecords - Filtered sleep records
