@@ -3817,10 +3817,33 @@
 
           return `${d}<br/>Bedtime: ${String(hh).padStart(2,"0")}:${String(mm).padStart(2,"0")}<br/>Duration: ${durationText}`;
         }},
+        legend: {
+          data: ['< 6h (short)', '6-7h (borderline)', '7-8h (optimal)', '> 8h (long)', 'Missing'],
+          bottom: 8,
+          left: 'center',
+          textStyle: { color: '#9fb0c3', fontSize: 11 },
+          itemGap: 16,
+          itemWidth: 14,
+          itemHeight: 14,
+          icon: 'circle'
+        },
+        grid: {
+          left: '3%',
+          right: '4%',
+          bottom: '50px',
+          top: '3%',
+          containLabel: true
+        },
         xAxis:{ type:"time", axisLabel:{ color:"#9fb0c3" } },
         yAxis:{ type:"value", min:12, max:36,
                axisLabel:{ color:"#9fb0c3", formatter:(v)=>{ const wrapped = v >= 24 ? v - 24 : v; const hh=Math.floor(wrapped); const mm=Math.round((wrapped%1)*60); return `${String(hh).padStart(2,"0")}:${String(mm).padStart(2,"0")}`; } } },
-        series:[ { name:"Bedtime", type:"scatter", data: pts, symbolSize:6 } ]
+        series:[
+          { name:"< 6h (short)", type:"scatter", data: pts.filter(p => { const idx = durationData.dates.indexOf(p.value[0]); const dur = idx >= 0 ? durationData.values[idx] : null; return dur && (dur/60) < 6; }), symbolSize:6, itemStyle: {color: '#ff5a6b'} },
+          { name:"6-7h (borderline)", type:"scatter", data: pts.filter(p => { const idx = durationData.dates.indexOf(p.value[0]); const dur = idx >= 0 ? durationData.values[idx] : null; return dur && (dur/60) >= 6 && (dur/60) < 7; }), symbolSize:6, itemStyle: {color: '#ffbf3a'} },
+          { name:"7-8h (optimal)", type:"scatter", data: pts.filter(p => { const idx = durationData.dates.indexOf(p.value[0]); const dur = idx >= 0 ? durationData.values[idx] : null; return dur && (dur/60) >= 7 && (dur/60) < 8; }), symbolSize:6, itemStyle: {color: '#3dce79'} },
+          { name:"> 8h (long)", type:"scatter", data: pts.filter(p => { const idx = durationData.dates.indexOf(p.value[0]); const dur = idx >= 0 ? durationData.values[idx] : null; return dur && (dur/60) >= 8; }), symbolSize:6, itemStyle: {color: '#3aa0ff'} },
+          { name:"Missing", type:"scatter", data: pts.filter(p => { const idx = durationData.dates.indexOf(p.value[0]); const dur = idx >= 0 ? durationData.values[idx] : null; return !dur; }), symbolSize:6, itemStyle: {color: '#6b7a8f'} }
+        ]
       }, true);
     }
 
