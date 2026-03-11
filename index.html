@@ -1258,6 +1258,32 @@
   }
 
   /**
+   * Filter out naps from sleep records
+   * @param {Array} sleepRecords - Array of sleep records
+   * @param {boolean} skipNaps - Whether to filter out naps
+   * @returns {Array} Filtered sleep records
+   *
+   * Nap detection logic:
+   * - Nap = sleep duration < 2h (120 minutes) AND starts between 10:00-17:00
+   * - Keeps records if:
+   *   - Duration >= 120 min (regardless of time)
+   *   - OR starts before 10:00 (morning sleep counts as night sleep)
+   *   - OR starts at/after 17:00 (evening/night sleep)
+   */
+  function filterNaps(sleepRecords, skipNaps) {
+    if (!skipNaps) return sleepRecords;
+
+    return sleepRecords.filter(record => {
+      const duration = record.durationMinutes || 0;
+      const fromDate = new Date(record.from);
+      const startHour = fromDate.getHours();
+
+      // Keep if duration >= 120 min OR starts outside 10:00-17:00 window
+      return duration >= 120 || startHour < 10 || startHour >= 17;
+    });
+  }
+
+  /**
    * Calculate sleep duration statistics
    * @param {Array} sleepData - Array of sleep records (SLEEP DATA MODEL CONTRACT)
    * @returns {Object} Statistics including avg, median, stdDev, min, max, percentiles, distribution
