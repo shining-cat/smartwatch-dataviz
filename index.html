@@ -3208,9 +3208,6 @@
     const patterns = detectWeeklyPatterns(avgWorkoutsPerDay, weekdayNames);
     const patternsContainer = $("workoutWeeklyInsights");
 
-    console.log('DEBUG: Weekly patterns detected:', patterns);
-    console.log('DEBUG: avgWorkoutsPerDay:', avgWorkoutsPerDay);
-
     if (patternsContainer) {
       if (patterns.length > 0) {
         patternsContainer.innerHTML = patterns.join(' • ');
