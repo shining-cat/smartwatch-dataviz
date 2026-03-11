@@ -1520,31 +1520,30 @@
     try {
       // Handle no data case
       if (!sleepData || sleepData.length === 0) {
-        container.innerHTML = `
-          <div class="card" style="text-align: center; padding: 40px;">
-            <div style="color: var(--muted); font-size: 14px;">
-              No sleep data available. Upload your health export to get started.
-            </div>
-          </div>
-        `;
+        // Hide the entire subsection (including header) when no data
+        if (container.parentElement) {
+          container.parentElement.style.display = 'none';
+        }
         return;
       }
 
       // Calculate statistics
       const stats = calculateSleepStats(sleepData);
       if (!stats) {
-        container.innerHTML = `
-          <div class="card" style="text-align: center; padding: 40px;">
-            <div style="color: var(--warn); font-size: 14px;">
-              Unable to calculate sleep statistics. Data may be corrupted.
-            </div>
-          </div>
-        `;
+        // Hide subsection if stats calculation fails
+        if (container.parentElement) {
+          container.parentElement.style.display = 'none';
+        }
         return;
       }
 
       // Generate histogram
       const histogram = generateDurationHistogram(sleepData);
+
+      // Show the subsection (in case it was hidden before)
+      if (container.parentElement) {
+        container.parentElement.style.display = 'block';
+      }
 
       // Create container HTML
       container.innerHTML = `
@@ -1883,10 +1882,15 @@
   async function renderSleepTiming(sleepData, containerId){
     console.log("Rendering sleep timing patterns...");
 
+    const container = $(containerId);
+
     // Validate data
     if (!sleepData || sleepData.length < 7){
       console.warn("Insufficient sleep data for timing analysis (need at least 7 nights)");
-      // Could show a message in UI here if needed
+      // Hide the entire subsection (including header) when insufficient data
+      if (container && container.parentElement) {
+        container.parentElement.style.display = 'none';
+      }
       return;
     }
 
@@ -1896,6 +1900,10 @@
 
     if (bedtimes.length === 0 || wakeTimes.length === 0){
       console.warn("No valid timing data extracted");
+      // Hide subsection when no valid timing data
+      if (container && container.parentElement) {
+        container.parentElement.style.display = 'none';
+      }
       return;
     }
 
@@ -1906,10 +1914,14 @@
     console.log("Timing insights:", { consistency, chronotype });
 
     // Render timing insights to UI container
-    const container = $(containerId);
     if (!container) {
       console.warn("Timing patterns container not found:", containerId);
       return;
+    }
+
+    // Show the subsection (in case it was hidden before)
+    if (container.parentElement) {
+      container.parentElement.style.display = 'block';
     }
 
     // Create insight cards with helpful tooltips
