@@ -126,7 +126,6 @@
                 </select>
                 <input type="checkbox" id="sleepSkipNaps" />
                 <label for="sleepSkipNaps" style="margin:0" title="Suspected naps are periods of sleep <2h, starting between 10:00 and 17:00">Skip naps</label>
-                <button id="renderSleepBtn" title="Render sleep charts">Render sleep</button>
               </div>
             </div>
             <div class="muted" style="margin-top:6px">
@@ -3879,7 +3878,18 @@
   }
   if ($("tabSleep")) $("tabSleep").addEventListener("click", ()=>setTab("sleep"));
   if ($("tabActivity")) $("tabActivity").addEventListener("click", ()=>setTab("activity"));
-  if ($("renderSleepBtn")) $("renderSleepBtn").addEventListener("click", ()=>renderSleepDashboard().catch(console.error));
+
+  // Sleep filter change handlers
+  if ($("sleepRangeSelect")) {
+    $("sleepRangeSelect").addEventListener("change", () => {
+      renderSleepDashboard().catch(console.error);
+    });
+  }
+  if ($("sleepSkipNaps")) {
+    $("sleepSkipNaps").addEventListener("change", () => {
+      renderSleepDashboard().catch(console.error);
+    });
+  }
 
   // Activity filter change handlers
   if ($("activityTypeSelect")) {
