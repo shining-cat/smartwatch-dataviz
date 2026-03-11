@@ -2413,6 +2413,7 @@
     }
 
     // Current streak (consecutive weeks with ≥1 workout)
+    const now = new Date();
     let currentStreak = 0;
     const weekMs = 7 * 24 * 60 * 60 * 1000;
     let checkDate = new Date(now);
