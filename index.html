@@ -3753,12 +3753,29 @@
       const bedtimeMinutes = bedtimeData.values[i]; // already in minutes
       const bedtimeHour = bedtimeMinutes / 60;
       const wrappedHour = wrapBedtimeHour(bedtimeHour);
-      return [d, wrappedHour];
+
+      // Get duration for this date from durationData
+      const durationIndex = durationData.dates.indexOf(d);
+      const durationMinutes = durationIndex >= 0 ? durationData.values[durationIndex] : null;
+      const durationHours = durationMinutes ? durationMinutes / 60 : null;
+
+      // Determine color based on duration
+      let color;
+      if (!durationHours) color = '#6b7a8f'; // Gray for missing
+      else if (durationHours < 6) color = '#ff5a6b';   // Red
+      else if (durationHours < 7) color = '#ffbf3a';   // Yellow
+      else if (durationHours < 8) color = '#3dce79';   // Green
+      else color = '#3aa0ff';                          // Blue
+
+      return {
+        value: [d, wrappedHour],
+        itemStyle: { color }
+      };
     });
     if (window.sleepBedChart){
       window.sleepBedChart.setOption({
         tooltip:{ formatter:(p)=>{
-          const d=p.data[0]; const wrappedV=p.data[1];
+          const d=p.data.value[0]; const wrappedV=p.data.value[1];
           const displayV = wrappedV >= 24 ? wrappedV - 24 : wrappedV;
           const hh=Math.floor(displayV); const mm=Math.round((displayV%1)*60);
           return `${d}<br/>Bedtime: ${String(hh).padStart(2,"0")}:${String(mm).padStart(2,"0")}`;
