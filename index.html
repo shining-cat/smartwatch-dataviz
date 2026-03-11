@@ -1271,11 +1271,12 @@
    *   - OR starts at/after 17:00 (evening/night sleep)
    */
   function filterNaps(sleepRecords, skipNaps) {
-    if (!skipNaps) return sleepRecords;
+    if (!skipNaps || !sleepRecords) return sleepRecords;
 
     return sleepRecords.filter(record => {
       const duration = record.durationMinutes || 0;
       const fromDate = new Date(record.from);
+      if (isNaN(fromDate.getTime())) return true; // Keep if date invalid (defensive)
       const startHour = fromDate.getHours();
 
       // Keep if duration >= 120 min OR starts outside 10:00-17:00 window
