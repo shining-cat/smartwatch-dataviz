@@ -583,17 +583,11 @@
 
             // Validate timestamps
             if (!fromDt || !toDt || isNaN(fromDt.getTime()) || isNaN(toDt.getTime())) {
-              if (activityType && activityType.toLowerCase() === 'hiking') {
-                console.error(`DEBUG: Hiking activity REJECTED - Invalid timestamps: from=${fromRaw}, to=${toRaw}`);
-              }
               console.warn(`Invalid timestamps in activities.csv: from=${fromRaw}, to=${toRaw}`);
               return;
             }
 
             if (fromDt >= toDt) {
-              if (activityType && activityType.toLowerCase() === 'hiking') {
-                console.error(`DEBUG: Hiking activity REJECTED - from >= to: ${fromRaw} >= ${toRaw}`);
-              }
               console.warn(`Invalid time range in activities.csv: from >= to (${fromRaw} >= ${toRaw})`);
               return;
             }
@@ -603,26 +597,12 @@
 
             // Validate duration (0 < duration < 1440 minutes = 24 hours)
             if (durationMinutes <= 0 || durationMinutes >= MINUTES_PER_DAY) {
-              if (activityType && activityType.toLowerCase() === 'hiking') {
-                console.error(`DEBUG: Hiking activity REJECTED - Invalid duration: ${durationMinutes} minutes`);
-              }
               console.warn(`Invalid duration in activities.csv: ${durationMinutes} minutes`);
               return;
             }
 
             // Extract date from 'from' timestamp
             const date = fromDt.toISOString().split('T')[0];
-
-            // Debug: Log first few activities for date 2026-02-12 to check for issues
-            if (date === '2026-02-12' && activityRecords.filter(r => r.date === '2026-02-12').length < 10) {
-              console.log(`DEBUG 2026-02-12: Activity #${activityRecords.filter(r => r.date === '2026-02-12').length + 1}:`, {
-                type: activityType,
-                from: fromRaw,
-                to: toRaw,
-                extractedDate: date,
-                duration: durationMinutes
-              });
-            }
 
             // Parse Data JSON field
             let dataObj = {};
@@ -710,27 +690,6 @@
 
               await db.activityRecords.bulkPut(activityRecords);
               console.log(`Stored ${activityRecords.length} activity records`);
-
-              // Debug: Show duration distribution
-              const durationBuckets = { '<5min': 0, '5-15min': 0, '15-30min': 0, '30-60min': 0, '>60min': 0 };
-              activityRecords.forEach(r => {
-                const dur = r.durationMinutes;
-                if (dur < 5) durationBuckets['<5min']++;
-                else if (dur < 15) durationBuckets['5-15min']++;
-                else if (dur < 30) durationBuckets['15-30min']++;
-                else if (dur < 60) durationBuckets['30-60min']++;
-                else durationBuckets['>60min']++;
-              });
-              console.log('DEBUG: Duration distribution:', durationBuckets);
-
-              // Debug: Verify hiking activities in database
-              const dbHikingCount = await db.activityRecords.where('activityType').equals('Hiking').count();
-              console.log(`DEBUG: After bulkPut, database contains ${dbHikingCount} Hiking activities`);
-
-              // Debug: Check all activity types in database
-              const allRecords = await db.activityRecords.toArray();
-              const types = new Set(allRecords.map(r => r.activityType));
-              console.log(`DEBUG: Activity types in database:`, Array.from(types).sort());
             }
             resolve();
           } catch (e) {
