@@ -3744,7 +3744,8 @@
       window.sleepDurChart.setOption({
         tooltip:{ trigger:"axis", formatter: (params)=> {
           const p=params[0]; const v=p?.data?.[1];
-          return `${p.axisValue}<br/>${v!=null?fmtHoursMins(v):"—"}`;
+          const date = new Date(p.axisValue).toISOString().split('T')[0];
+          return `${date}<br/>${v!=null?fmtHoursMins(v):"—"}`;
         }},
         xAxis:{ type:"time", axisLabel:{ color:"#9fb0c3" } },
         yAxis:{ type:"value", axisLabel:{ color:"#9fb0c3", formatter:(v)=>`${Math.round(v/60)}h` } },
