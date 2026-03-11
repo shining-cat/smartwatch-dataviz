@@ -3748,19 +3748,27 @@
       window.sleepBedChart = echarts.init(bedEl, null, { renderer:"canvas" });
       window.addEventListener("resize", ()=>{ try{ window.sleepBedChart.resize(); }catch(e){} });
     }
-    const bDates = ins.bd.dates;
-    const bVals = ins.bd.values;
-    const pts = bDates.map((d,i)=>[d, bVals[i]/60]); // hours
+    // Build bedtime data from sleepRecordsForAnalysis with wrapping
+    const pts = [];
+    for (const record of sleepRecordsForAnalysis) {
+      if (!record.from) continue;
+      const fromDate = new Date(record.from);
+      const bedtimeMinutes = fromDate.getHours() * 60 + fromDate.getMinutes();
+      const bedtimeHour = bedtimeMinutes / 60;
+      const wrappedHour = wrapBedtimeHour(bedtimeHour);
+      pts.push([record.date, wrappedHour]);
+    }
     if (window.sleepBedChart){
       window.sleepBedChart.setOption({
         tooltip:{ formatter:(p)=>{
-          const d=p.data[0]; const v=p.data[1];
-          const hh=Math.floor(v); const mm=Math.round((v%1)*60);
+          const d=p.data[0]; const wrappedV=p.data[1];
+          const displayV = wrappedV >= 24 ? wrappedV - 24 : wrappedV;
+          const hh=Math.floor(displayV); const mm=Math.round((displayV%1)*60);
           return `${d}<br/>Bedtime: ${String(hh).padStart(2,"0")}:${String(mm).padStart(2,"0")}`;
         }},
         xAxis:{ type:"time", axisLabel:{ color:"#9fb0c3" } },
-        yAxis:{ type:"value", min:0, max:24,
-               axisLabel:{ color:"#9fb0c3", formatter:(v)=>{ const hh=Math.floor(v); const mm=Math.round((v%1)*60); return `${String(hh).padStart(2,"0")}:${String(mm).padStart(2,"0")}`; } } },
+        yAxis:{ type:"value", min:12, max:36,
+               axisLabel:{ color:"#9fb0c3", formatter:(v)=>{ const wrapped = v >= 24 ? v - 24 : v; const hh=Math.floor(wrapped); const mm=Math.round((wrapped%1)*60); return `${String(hh).padStart(2,"0")}:${String(mm).padStart(2,"0")}`; } } },
         series:[ { name:"Bedtime", type:"scatter", data: pts, symbolSize:6 } ]
       }, true);
     }
