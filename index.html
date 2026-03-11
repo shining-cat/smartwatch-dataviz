@@ -3465,7 +3465,7 @@
 
       // Section 1: Workout Habits
       setProgress(40, "Rendering workout overview…");
-      renderWorkoutOverview(filteredRecords, selectedType);
+      renderWorkoutOverview(filteredRecords, selectedType, selectedRange, cutoffDate);
 
       setProgress(50, "Rendering workout heatmap…");
       await renderWorkoutHeatmap(filteredRecords, cutoffDate);
