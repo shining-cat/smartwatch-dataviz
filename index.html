@@ -2612,12 +2612,15 @@
       patterns.push(`Mid-week slump on ${weekdayNames[minDay]}`);
     }
 
-    // Pattern 4: Consistent (if no significant patterns detected)
+    // Pattern 4: Fallback (if no significant patterns detected)
     if (patterns.length === 0) {
       const maxDay = avgWorkoutsPerDay.indexOf(Math.max(...avgWorkoutsPerDay));
       const maxDeviation = Math.abs(avgWorkoutsPerDay[maxDay] - weeklyMean) / weeklyMean;
       if (maxDeviation < 0.2) {
         patterns.push(`✅ Consistent: evenly distributed across the week`);
+      } else {
+        // Some variation exists but doesn't match specific patterns
+        patterns.push(`No significant weekly patterns detected`);
       }
     }
 
