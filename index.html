@@ -1494,9 +1494,14 @@
         ).length;
       });
 
+      // Filter out empty bins (bins with 0 count)
+      const nonEmptyIndices = counts.map((count, idx) => count > 0 ? idx : -1).filter(idx => idx >= 0);
+      const nonEmptyBins = nonEmptyIndices.map(idx => bins[idx].label);
+      const nonEmptyCounts = nonEmptyIndices.map(idx => counts[idx]);
+
       return {
-        bins: bins.map(b => b.label),
-        counts,
+        bins: nonEmptyBins,
+        counts: nonEmptyCounts,
         total: validData.length
       };
     } catch (error) {
