@@ -1285,6 +1285,82 @@
   }
 
   /**
+   * Re-aggregate filtered sleep records into daily aggregates
+   * This allows nap filtering to affect all dashboard components
+   * @param {Array} sleepRecords - Filtered sleep records
+   * @returns {Object} {durationData, sleepData} - Daily aggregates for Overview and Weekly Patterns
+   */
+  function reaggregateSleepRecords(sleepRecords) {
+    if (!sleepRecords || sleepRecords.length === 0) {
+      return {
+        durationData: { dates: [], values: [] },
+        bedtimeData: { dates: [], values: [] },
+        sleepData: []
+      };
+    }
+
+    // Group records by date and aggregate
+    const dateMap = new Map();
+
+    for (const record of sleepRecords) {
+      const date = record.date;
+      if (!dateMap.has(date)) {
+        dateMap.set(date, {
+          date,
+          durationMinutes: 0,
+          bedtimeMin: null,
+          wakeMin: null,
+          durationHours: 0,
+          dayOfWeek: record.dayOfWeek,
+          weekdayName: record.weekdayName
+        });
+      }
+
+      const entry = dateMap.get(date);
+      // Sum durations if multiple sleep sessions per day
+      entry.durationMinutes += record.durationMinutes || 0;
+      entry.durationHours = entry.durationMinutes / 60;
+
+      // Use earliest bedtime if multiple sessions
+      if (record.from) {
+        const fromDt = new Date(record.from);
+        const bedtimeMin = fromDt.getHours() * 60 + fromDt.getMinutes();
+        if (entry.bedtimeMin === null || bedtimeMin < entry.bedtimeMin) {
+          entry.bedtimeMin = bedtimeMin;
+        }
+      }
+
+      // Use latest wake time if multiple sessions
+      if (record.to) {
+        const toDt = new Date(record.to);
+        const wakeMin = toDt.getHours() * 60 + toDt.getMinutes();
+        if (entry.wakeMin === null || wakeMin > entry.wakeMin) {
+          entry.wakeMin = wakeMin;
+        }
+      }
+    }
+
+    // Convert to arrays sorted by date
+    const sortedEntries = Array.from(dateMap.values()).sort((a, b) => a.date.localeCompare(b.date));
+
+    const durationData = {
+      dates: sortedEntries.map(e => e.date),
+      values: sortedEntries.map(e => e.durationMinutes)
+    };
+
+    const bedtimeData = {
+      dates: sortedEntries.filter(e => e.bedtimeMin !== null).map(e => e.date),
+      values: sortedEntries.filter(e => e.bedtimeMin !== null).map(e => e.bedtimeMin)
+    };
+
+    return {
+      durationData,
+      bedtimeData,
+      sleepData: sortedEntries
+    };
+  }
+
+  /**
    * Calculate sleep duration statistics
    * @param {Array} sleepData - Array of sleep records (SLEEP DATA MODEL CONTRACT)
    * @returns {Object} Statistics including avg, median, stdDev, min, max, percentiles, distribution
@@ -3546,25 +3622,57 @@
       }
     }
 
-    const ins = await computeSleepInsights();
+    // CRITICAL FIX: Fetch and filter sleep records FIRST, then re-aggregate
+    // This ensures nap filter affects ALL components (Overview, Bedtime, Weekly Patterns, Deep Dive)
+    setProgress(25, "Loading sleep data…");
+    let allSleepRecords = await fetchSleepRecords();
 
-    // Apply date range filter to time series data
+    // Apply nap filter
+    const skipNaps = $("sleepSkipNaps") ? $("sleepSkipNaps").checked : false;
+    const filteredSleepRecords = filterNaps(allSleepRecords, skipNaps);
+
+    // Apply date range filter to sleep records
+    let sleepRecordsForAnalysis = filteredSleepRecords;
     if (cutoffDate) {
-      ins.dur = filterByDateRange(ins.dur, cutoffDate);
-      ins.bd = filterByDateRange(ins.bd, cutoffDate);
-
-      // Recalculate stats for filtered data (for overview cards)
-      if (ins.dur.values.length > 0) {
-        const last30 = ins.dur.values.slice(Math.max(0, ins.dur.values.length - 30));
-        ins.avg30 = mean(last30);
-        ins.overallAvg = mean(ins.dur.values);
-        ins.pctBelow6 = last30.filter(v => v < 360).length / last30.length;
-      }
-      if (ins.bd.values.length > 0) {
-        const last30Bed = ins.bd.values.slice(Math.max(0, ins.bd.values.length - 30));
-        ins.bedtimeStd = std(last30Bed);
-      }
+      const cutoffStr = cutoffDate.toISOString().split('T')[0];
+      sleepRecordsForAnalysis = filteredSleepRecords.filter(r => r.date >= cutoffStr);
     }
+
+    // Check if all records were filtered out
+    if (sleepRecordsForAnalysis.length === 0) {
+      const noticeHTML = skipNaps
+        ? '<div class="notice">All sleep records appear to be naps. Uncheck "Skip naps" to see data.</div>'
+        : '<div class="notice">No sleep data available for the selected date range.</div>';
+      const containers = ["sleepInsightCards", "sleepDeepDiveDuration", "sleepDeepDiveTiming", "weeklyPatternInsights"];
+      containers.forEach(id => {
+        const el = $(id);
+        if (el) el.innerHTML = noticeHTML;
+      });
+      setProgress(100, "No sleep data after filtering");
+      return;
+    }
+
+    // Re-aggregate filtered records into daily aggregates
+    setProgress(30, "Re-aggregating sleep data…");
+    const { durationData, bedtimeData, sleepData } = reaggregateSleepRecords(sleepRecordsForAnalysis);
+
+    // Calculate insights from re-aggregated data
+    const last30Dur = durationData.values.slice(Math.max(0, durationData.values.length - 30));
+    const avg30 = mean(last30Dur);
+    const overallAvg = mean(durationData.values);
+    const pctBelow6 = last30Dur.length ? (last30Dur.filter(v => v < 360).length / last30Dur.length) : 0;
+
+    const last30Bed = bedtimeData.values.slice(Math.max(0, bedtimeData.values.length - 30));
+    const bedtimeStd = std(last30Bed);
+
+    const ins = {
+      dur: durationData,
+      bd: bedtimeData,
+      avg30,
+      overallAvg,
+      pctBelow6,
+      bedtimeStd
+    };
 
     // cards
     const cardsEl = $("sleepInsightCards");
@@ -3642,28 +3750,11 @@
     // (Agents 1, 2, 3 working in coordination)
     // ========================================
 
-    // Fetch sleep records for all three agent components
-    setProgress(70, "Loading sleep data for Deep Dive analysis…");
-    let sleepRecordsData = await fetchSleepRecords();
-
-    // Apply nap filter
-    const skipNaps = $("sleepSkipNaps") ? $("sleepSkipNaps").checked : false;
-    sleepRecordsData = filterNaps(sleepRecordsData, skipNaps);
-
-    // Check if all records were filtered out
-    if (skipNaps && sleepRecordsData.length === 0) {
-      const noticeHTML = '<div class="notice">All sleep records appear to be naps. Uncheck "Skip naps" to see data.</div>';
-      const containers = ["sleepInsightCards", "sleepDeepDiveDuration", "sleepDeepDiveTiming", "weeklyPatternInsights"];
-      containers.forEach(id => {
-        const el = $(id);
-        if (el) el.innerHTML = noticeHTML;
-      });
-      setProgress(100, "No sleep data after nap filtering");
-      return;
-    }
+    // Use already-filtered sleep records (no need to fetch again)
+    setProgress(70, "Analyzing sleep data for Deep Dive…");
 
     // Validate sleep data quality (DEFENSIVE CODING)
-    const validation = validateSleepData(sleepRecordsData);
+    const validation = validateSleepData(sleepRecordsForAnalysis);
     if (!validation.valid) {
       console.warn('Sleep data validation failed:', validation.issues);
       const errorMsg = validation.issues.join('. ');
@@ -3680,13 +3771,8 @@
       console.warn('Sleep data quality warnings:', validation.issues);
     }
 
-    // Use validated records for analysis
+    // Use validated records for analysis (already filtered by naps and date range)
     let validSleepRecords = validation.validRecords;
-
-    // Apply date range filter to Sleep Deep Dive data
-    if (cutoffDate) {
-      validSleepRecords = filterByDateRange(validSleepRecords, cutoffDate);
-    }
 
     // Agent 1: Duration Analysis
     setProgress(75, "Analyzing sleep duration patterns…");
@@ -3710,12 +3796,7 @@
 
     // Agent 3: Weekly Pattern Detection
     setProgress(85, "Analyzing weekly patterns…");
-    let sleepData = await fetchSleepData();
-
-    // Apply date range filter to weekly patterns data
-    if (cutoffDate) {
-      sleepData = filterByDateRange(sleepData, cutoffDate);
-    }
+    // Use already re-aggregated sleepData (already filtered by naps and date range)
 
     // Delay chart initialization to ensure container is visible and measured
     await new Promise(resolve => setTimeout(resolve, 100));
