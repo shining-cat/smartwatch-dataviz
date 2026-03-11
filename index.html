@@ -1305,6 +1305,19 @@
   }
 
   /**
+   * Format duration in minutes to human-readable format (e.g., "7h 25m")
+   * @param {number} durationMinutes - Duration in minutes
+   * @returns {string} Formatted duration string
+   */
+  function formatDuration(durationMinutes) {
+    if (!durationMinutes) return "—";
+    const hours = Math.floor(durationMinutes / 60);
+    const mins = Math.round(durationMinutes % 60);
+    if (mins === 0) return `${hours}h`;
+    return `${hours}h ${mins}m`;
+  }
+
+  /**
    * Re-aggregate filtered sleep records into daily aggregates
    * This allows nap filtering to affect all dashboard components
    * @param {Array} sleepRecords - Filtered sleep records
@@ -3778,7 +3791,13 @@
           const d=p.data.value[0]; const wrappedV=p.data.value[1];
           const displayV = wrappedV >= 24 ? wrappedV - 24 : wrappedV;
           const hh=Math.floor(displayV); const mm=Math.round((displayV%1)*60);
-          return `${d}<br/>Bedtime: ${String(hh).padStart(2,"0")}:${String(mm).padStart(2,"0")}`;
+
+          // Look up duration for this date
+          const durationIndex = durationData.dates.indexOf(d);
+          const durationMinutes = durationIndex >= 0 ? durationData.values[durationIndex] : null;
+          const durationText = formatDuration(durationMinutes);
+
+          return `${d}<br/>Bedtime: ${String(hh).padStart(2,"0")}:${String(mm).padStart(2,"0")}<br/>Duration: ${durationText}`;
         }},
         xAxis:{ type:"time", axisLabel:{ color:"#9fb0c3" } },
         yAxis:{ type:"value", min:12, max:36,
