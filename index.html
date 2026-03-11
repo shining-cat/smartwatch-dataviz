@@ -48,6 +48,27 @@
     .insight-card{ background:#0f1521; border:1px solid #223046; padding:10px; border-radius:8px; min-width:170px; }
 
 #tabSleep{ display:inline-flex !important; }
+
+    /* Custom fast tooltips */
+    .custom-tooltip {
+      position: fixed;
+      background: rgba(18, 24, 36, 0.98);
+      border: 1px solid #2a3a55;
+      border-radius: 8px;
+      padding: 8px 12px;
+      color: #e7eef7;
+      font-size: 12px;
+      line-height: 1.4;
+      max-width: 300px;
+      z-index: 10000;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.15s ease;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+    .custom-tooltip.show {
+      opacity: 1;
+    }
 </style>
 </head>
 <body>
@@ -4062,6 +4083,126 @@
     const f = e.dataTransfer.files && e.dataTransfer.files[0];
     if (f) ingestZip(f).catch(err=>{ console.error(err); log("Error: " + err.message); });
   });
+
+
+  // ========================================
+  // CUSTOM FAST TOOLTIPS INITIALIZATION
+  // ========================================
+
+  (function initFastTooltips() {
+    // Create tooltip element
+    const tooltip = document.createElement('div');
+    tooltip.className = 'custom-tooltip';
+    document.body.appendChild(tooltip);
+
+    let currentTarget = null;
+    let showTimer = null;
+    let hideTimer = null;
+
+    // Show tooltip with delay
+    function showTooltip(element, text, event) {
+      clearTimeout(hideTimer);
+      clearTimeout(showTimer);
+
+      currentTarget = element;
+      tooltip.textContent = text;
+
+      showTimer = setTimeout(() => {
+        if (currentTarget === element) {
+          // Position tooltip near mouse
+          const x = event.clientX;
+          const y = event.clientY;
+          const offset = 12;
+
+          // Initial positioning
+          tooltip.style.left = (x + offset) + 'px';
+          tooltip.style.top = (y + offset) + 'px';
+
+          // Show tooltip
+          tooltip.classList.add('show');
+
+          // Adjust if tooltip goes off screen
+          requestAnimationFrame(() => {
+            const rect = tooltip.getBoundingClientRect();
+            const viewportWidth = window.innerWidth;
+            const viewportHeight = window.innerHeight;
+
+            let finalX = x + offset;
+            let finalY = y + offset;
+
+            // If tooltip goes off right edge, show on left of cursor
+            if (rect.right > viewportWidth - 10) {
+              finalX = x - rect.width - offset;
+            }
+
+            // If tooltip goes off bottom edge, show above cursor
+            if (rect.bottom > viewportHeight - 10) {
+              finalY = y - rect.height - offset;
+            }
+
+            tooltip.style.left = finalX + 'px';
+            tooltip.style.top = finalY + 'px';
+          });
+        }
+      }, 300); // 300ms delay (much faster than browser default)
+    }
+
+    // Hide tooltip
+    function hideTooltip() {
+      clearTimeout(showTimer);
+      currentTarget = null;
+
+      // Small delay before hiding for smoother UX
+      hideTimer = setTimeout(() => {
+        tooltip.classList.remove('show');
+      }, 50);
+    }
+
+    // Set up event delegation for all elements with title attribute
+    document.body.addEventListener('mouseenter', (event) => {
+      const element = event.target.closest('[title]');
+      if (element) {
+        const title = element.getAttribute('title');
+        if (title && title.trim()) {
+          // Store original title and remove it to prevent native tooltip
+          element.setAttribute('data-tooltip', title);
+          element.removeAttribute('title');
+
+          showTooltip(element, title, event);
+        }
+      }
+    }, true);
+
+    document.body.addEventListener('mouseleave', (event) => {
+      const element = event.target.closest('[data-tooltip]');
+      if (element) {
+        // Restore original title attribute
+        const title = element.getAttribute('data-tooltip');
+        if (title) {
+          element.setAttribute('title', title);
+          element.removeAttribute('data-tooltip');
+        }
+
+        if (currentTarget === element) {
+          hideTooltip();
+        }
+      }
+    }, true);
+
+    // Update tooltip position on mouse move (for smoother tracking)
+    document.body.addEventListener('mousemove', (event) => {
+      if (currentTarget && tooltip.classList.contains('show')) {
+        const x = event.clientX;
+        const y = event.clientY;
+        const offset = 12;
+
+        tooltip.style.left = (x + offset) + 'px';
+        tooltip.style.top = (y + offset) + 'px';
+      }
+    });
+
+    console.log('Fast tooltips initialized (300ms delay)');
+  })();
 
   // Boot auto-reload
   (async function boot(){
