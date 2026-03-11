@@ -2402,13 +2402,15 @@
     const sorted = [...activityRecords].sort((a, b) => a.date.localeCompare(b.date));
     const sessionCount = sorted.length;
 
-    // Workouts per week (last 30 days)
-    const now = new Date();
-    const thirtyDaysAgo = new Date(now);
-    thirtyDaysAgo.setDate(now.getDate() - 30);
-    const thirtyDaysAgoStr = thirtyDaysAgo.toISOString().split('T')[0];
-    const recentWorkouts = sorted.filter(r => r.date >= thirtyDaysAgoStr);
-    const workoutsPerWeek = (recentWorkouts.length / 30) * 7;
+    // Workouts per week - calculate based on actual date span in provided records
+    let workoutsPerWeek = 0;
+    if (sorted.length > 0) {
+      const earliestDate = new Date(sorted[0].date);
+      const latestDate = new Date(sorted[sorted.length - 1].date);
+      const daySpan = Math.max(1, Math.floor((latestDate - earliestDate) / (1000 * 60 * 60 * 24)) + 1);
+      const weekSpan = daySpan / 7;
+      workoutsPerWeek = weekSpan > 0 ? sorted.length / weekSpan : 0;
+    }
 
     // Current streak (consecutive weeks with ≥1 workout)
     let currentStreak = 0;
