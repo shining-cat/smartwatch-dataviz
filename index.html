@@ -106,36 +106,8 @@
 
       <div class="card">
         <div class="tabs">
-          <div class="tab active" id="tabTimeline">Timeline</div>
-          <div class="tab" id="tabActivity">Activity</div>
+          <div class="tab active" id="tabActivity">Activity</div>
           <div class="tab" id="tabSleep">Sleep</div>
-        </div>
-
-        <div id="controlsTimeline" class="card" style="background:transparent; border:none; padding:0; margin-bottom:10px">
-          <div class="row" style="align-items:flex-start">
-            <div style="flex:1; min-width: 260px;">
-              <label title="Pick one or more metrics to plot over time. Ctrl/Cmd-click to select multiple.">Metrics (multi-select)</label>
-              <select id="metricSelect" multiple size="8"></select>
-              <div class="muted" style="margin-top:6px">Tip: Ctrl/Cmd-click to multi-select.</div>
-            </div>
-            <div style="flex:1; min-width: 260px;">
-              <label>Options</label>
-              <div class="row" style="margin-top:8px">
-                <input id="rolling7" type="checkbox" />
-                <label for="rolling7" title="Smooths day-to-day noise by averaging each day with the previous days (here: 7 days). Helps you see the overall trend.">7-day rolling average</label>
-              </div>
-              <div class="row" style="margin-top:8px">
-                <input id="normalize" type="checkbox" />
-                <label for="normalize" title="Puts each selected metric on the same relative scale (how far above/below its own average). Useful when comparing different units like steps vs kg.">Normalize (z-score) per metric</label>
-              </div>
-              <div class="row" style="margin-top:10px">
-                <button id="renderTimelineBtn" class="primary">Render timeline</button>
-              </div>
-              <div class="muted" style="margin-top:10px">
-                Timeline uses daily data (aggregates + derived daily sleep + daily weight).
-              </div>
-            </div>
-          </div>
         </div>
 
         <div id="controlsSleep" style="display:none">
@@ -557,7 +529,6 @@
         setTab("activity");
       }
     } catch(e){ console.error(e); }
-    await refreshMetricPickersFromDB();
     await renderDefault();
   }
 
@@ -934,17 +905,17 @@
   }
 
   async function renderDefault(){
-    await renderTimeline();
-    // Also render sleep/activity if data exists (for initial load)
+    // Default to Activity tab (or Sleep if no activity data)
     try {
-      const sleepCount = await db.sleepRecords.count();
-      if (sleepCount > 0) await renderSleepDashboard();
-
       const activityCount = await db.activityRecords.count();
       if (activityCount > 0) {
-        // Populate dropdown before rendering
         await populateActivityTypeDropdown();
-        await renderActivityDashboard();
+        setTab("activity");
+      } else {
+        const sleepCount = await db.sleepRecords.count();
+        if (sleepCount > 0) {
+          setTab("sleep");
+        }
       }
     } catch(e) {
       console.error('Error in renderDefault:', e);
@@ -3759,38 +3730,27 @@
 
   // Tabs
   function setTab(tab){
-    const isTimeline = tab === "timeline";
     const isSleep = tab === "sleep";
     const isActivity = tab === "activity";
 
-    $("tabTimeline").classList.toggle("active", isTimeline);
     if ($("tabSleep")) $("tabSleep").classList.toggle("active", isSleep);
     if ($("tabActivity")) $("tabActivity").classList.toggle("active", isActivity);
 
-    $("controlsTimeline").style.display = isTimeline ? "" : "none";
     if ($("controlsSleep")) $("controlsSleep").style.display = isSleep ? "" : "none";
     if ($("controlsActivity")) $("controlsActivity").style.display = isActivity ? "" : "none";
 
-    // main charts vs sleep charts vs activity charts
     if ($("sleepCharts")) $("sleepCharts").style.display = isSleep ? "" : "none";
     if ($("activityCharts")) $("activityCharts").style.display = isActivity ? "" : "none";
 
-    if (isTimeline){
-      $("chart").style.display = "";
-      $("chart2").style.display = "none";
-      renderTimeline().catch(console.error);
-    } else if (isSleep){
-      $("chart").style.display = "none";
-      $("chart2").style.display = "none";
+    $("chart").style.display = "none";
+    $("chart2").style.display = "none";
+
+    if (isSleep){
       renderSleepDashboard().catch(console.error);
     } else if (isActivity){
-      $("chart").style.display = "none";
-      $("chart2").style.display = "none";
-      // Auto-render Activity tab (like Sleep tab)
       renderActivityDashboard().catch(console.error);
     }
   }
-  $("tabTimeline").addEventListener("click", ()=>setTab("timeline"));
   if ($("tabSleep")) $("tabSleep").addEventListener("click", ()=>setTab("sleep"));
   if ($("tabActivity")) $("tabActivity").addEventListener("click", ()=>setTab("activity"));
   if ($("renderSleepBtn")) $("renderSleepBtn").addEventListener("click", ()=>renderSleepDashboard().catch(console.error));
@@ -3811,7 +3771,6 @@
       renderActivityDashboard().catch(console.error);
     });
   }
-  $("renderTimelineBtn").addEventListener("click", ()=>renderTimeline().catch(console.error));
   $("wipeBtn").addEventListener("click", ()=>wipeStorage().catch(console.error));
 
   // Debug toggle
@@ -3834,13 +3793,12 @@
     if (f) ingestZip(f).catch(err=>{ console.error(err); log("Error: " + err.message); });
   });
 
-  $("debugRenderBtn").addEventListener("click", async ()=>{ log("Clicked: Debug render"); try { await renderTimeline(); log("Debug render done."); } catch(e){ console.error(e); log("Debug render error: " + (e.message||String(e))); } });
+  $("debugRenderBtn").addEventListener("click", async ()=>{ log("Clicked: Debug render"); try { await renderActivityDashboard(); log("Debug render done."); } catch(e){ console.error(e); log("Debug render error: " + (e.message||String(e))); } });
 
   $("reloadBtn").addEventListener("click", async ()=>{
     logEl.textContent = "";
     log("Reloading from IndexedDB…");
     setProgress(100, "Reloading from storage…");
-    await refreshMetricPickersFromDB();
     const m = await db.meta.get("dateMin");
     if (m && m.value){
       $("kpis").style.display = "";
@@ -3872,8 +3830,7 @@
     log("App ready. Load a ZIP, or click “Reload from storage”.");
     const m = await db.meta.get("dateMin");
     if (m && m.value){
-      await refreshMetricPickersFromDB();
-      $("kpis").style.display = "";
+        $("kpis").style.display = "";
       $("kpiRange").textContent = `${(await db.meta.get("dateMin")).value} → ${(await db.meta.get("dateMax")).value}`;
       $("kpiDays").textContent = String((await db.meta.get("days")).value ?? "—");
       const metrics = (await db.meta.get("metrics")).value ?? [];
