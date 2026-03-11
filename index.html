@@ -47,6 +47,43 @@
   
     .insight-card{ background:#0f1521; border:1px solid #223046; padding:10px; border-radius:8px; min-width:170px; }
 
+    /* Control panel styling - distinct top section */
+    .control-panel {
+      background: linear-gradient(135deg, #0d1218 0%, #121824 100%);
+      border: 1px solid #2a3a55;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(58, 160, 255, 0.1);
+    }
+
+    /* Improved tab buttons */
+    .tabs { display:flex; gap:12px; margin-bottom:16px; }
+    .tab {
+      padding: 12px 20px;
+      border-radius: 12px;
+      border: 2px solid #223046;
+      background: linear-gradient(180deg, #0f1521, #0b1018);
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 15px;
+      font-weight: 600;
+      transition: all 0.2s ease;
+      letter-spacing: 0.3px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    }
+    .tab:hover {
+      border-color: #2c4061;
+      transform: translateY(-1px);
+      box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3);
+    }
+    .tab.active {
+      color: var(--fg);
+      border-color: #2b66b6;
+      background: linear-gradient(135deg, rgba(58,160,255,0.15), rgba(58,160,255,0.08));
+      box-shadow: 0 0 0 1px rgba(58, 160, 255, 0.3),
+                  0 4px 12px rgba(58, 160, 255, 0.2),
+                  inset 0 1px 0 rgba(255, 255, 255, 0.1);
+      transform: translateY(-2px);
+    }
+
 #tabSleep{ display:inline-flex !important; }
 
     /* Custom fast tooltips */
@@ -80,7 +117,7 @@
 
   <main>
     <div class="grid">
-      <div class="card">
+      <div class="card control-panel">
         <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap">
           <input id="fileInput" type="file" accept=".zip" style="display:none" />
           <button class="primary" id="chooseBtn">Choose ZIP</button>
@@ -127,8 +164,8 @@
 
       <div class="card">
         <div class="tabs">
-          <div class="tab active" id="tabActivity">Activity</div>
-          <div class="tab" id="tabSleep">Sleep</div>
+          <div class="tab active" id="tabActivity">📊 Activity</div>
+          <div class="tab" id="tabSleep">😴 Sleep</div>
         </div>
 
         <div id="controlsSleep" style="display:none">
