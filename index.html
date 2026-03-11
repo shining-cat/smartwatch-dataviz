@@ -2746,7 +2746,7 @@
    * @param {number} minutes - Duration in minutes
    * @returns {string} Formatted duration (e.g., "1h 30min" or "45 min")
    */
-  function formatDuration(minutes) {
+  function formatWorkoutDuration(minutes) {
     if (!minutes || minutes === 0) return "0 min";
     const hours = Math.floor(minutes / 60);
     const mins = Math.round(minutes % 60);
@@ -2814,11 +2814,11 @@
       cardsEl.appendChild(mk("Workouts/week", stats.workoutsPerWeek.toFixed(1), "Last 30 days", "Your average weekly workout frequency over the last 30 days", trends.workoutsPerWeek));
       cardsEl.appendChild(mk("Current streak", `${stats.currentStreak} week${stats.currentStreak !== 1 ? 's' : ''}`, stats.currentStreak === 0 ? "No active streak" : "Consecutive weeks", "How many consecutive weeks you've had at least one workout", trends.currentStreak));
       cardsEl.appendChild(mk("Longest gap", `${stats.longestGap} days`, "Max time without workout", "Your longest period without a workout in the selected date range", trends.longestGap));
-      cardsEl.appendChild(mk("Avg duration", formatDuration(stats.avgDuration), "Per workout", "Average duration across all workouts in selected range", trends.avgDuration));
+      cardsEl.appendChild(mk("Avg duration", formatWorkoutDuration(stats.avgDuration), "Per workout", "Average duration across all workouts in selected range", trends.avgDuration));
     } else {
       // Type-specific overview
       cardsEl.appendChild(mk(`${selectedType} sessions`, stats.sessionCount, "In selected range", null, null));
-      cardsEl.appendChild(mk("Avg duration", formatDuration(stats.avgDuration), "Per session", null, trends.avgDuration));
+      cardsEl.appendChild(mk("Avg duration", formatWorkoutDuration(stats.avgDuration), "Per session", null, trends.avgDuration));
 
       // Average distance (if available)
       const withDistance = filteredRecords.filter(r => r.distance != null && r.distance > 0);
@@ -2980,7 +2980,7 @@
           if (dayData && dayData.activities.length > 0) {
             tooltip += '<div style="margin-top:8px; font-size:12px;">';
             dayData.activities.forEach(activity => {
-              tooltip += `• ${activity.type}: ${formatDuration(activity.duration)}<br/>`;
+              tooltip += `• ${activity.type}: ${formatWorkoutDuration(activity.duration)}<br/>`;
             });
             tooltip += '</div>';
           }
