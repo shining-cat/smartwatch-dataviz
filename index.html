@@ -175,6 +175,13 @@
                   <option value="2y">Last 2 years</option>
                   <option value="all" selected>All time</option>
                 </select>
+                <label for="activityMinDuration" style="margin:0" title="Filter out short auto-tracked sessions">Min Duration:</label>
+                <select id="activityMinDuration" style="width:120px">
+                  <option value="0" selected>All (incl. auto-tracked)</option>
+                  <option value="15">15+ min</option>
+                  <option value="30">30+ min</option>
+                  <option value="60">60+ min</option>
+                </select>
               </div>
             </div>
             <div class="muted" style="margin-top:6px">
@@ -3456,8 +3463,10 @@
     // Get filters
     const typeSelect = $("activityTypeSelect");
     const rangeSelect = $("activityRangeSelect");
+    const minDurationSelect = $("activityMinDuration");
     const selectedType = typeSelect ? typeSelect.value : 'all';
     const selectedRange = rangeSelect ? rangeSelect.value : 'all';
+    const minDuration = minDurationSelect ? parseInt(minDurationSelect.value) : 0;
 
     // Calculate cutoff date
     let cutoffDate = null;
@@ -3485,6 +3494,13 @@
       if (cutoffDate) {
         const cutoffStr = cutoffDate.toISOString().split('T')[0];
         activityRecords = activityRecords.filter(r => r.date >= cutoffStr);
+      }
+
+      // Apply minimum duration filter (to remove auto-tracked short sessions)
+      if (minDuration > 0) {
+        const beforeFilter = activityRecords.length;
+        activityRecords = activityRecords.filter(r => r.durationMinutes >= minDuration);
+        console.log(`Duration filter (>=${minDuration}min): ${beforeFilter} → ${activityRecords.length} activities`);
       }
 
       // Apply activity type filter
@@ -3810,6 +3826,11 @@
   }
   if ($("activityRangeSelect")) {
     $("activityRangeSelect").addEventListener("change", ()=>{
+      renderActivityDashboard().catch(console.error);
+    });
+  }
+  if ($("activityMinDuration")) {
+    $("activityMinDuration").addEventListener("change", ()=>{
       renderActivityDashboard().catch(console.error);
     });
   }
