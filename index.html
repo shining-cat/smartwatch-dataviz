@@ -606,6 +606,17 @@
             // Extract date from 'from' timestamp
             const date = fromDt.toISOString().split('T')[0];
 
+            // Debug: Log first few activities for date 2026-02-12 to check for issues
+            if (date === '2026-02-12' && activityRecords.filter(r => r.date === '2026-02-12').length < 10) {
+              console.log(`DEBUG 2026-02-12: Activity #${activityRecords.filter(r => r.date === '2026-02-12').length + 1}:`, {
+                type: activityType,
+                from: fromRaw,
+                to: toRaw,
+                extractedDate: date,
+                duration: durationMinutes
+              });
+            }
+
             // Parse Data JSON field
             let dataObj = {};
             const dataRaw = r.Data || r.data;
