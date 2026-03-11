@@ -3644,7 +3644,23 @@
 
     // Fetch sleep records for all three agent components
     setProgress(70, "Loading sleep data for Deep Dive analysis…");
-    const sleepRecordsData = await fetchSleepRecords();
+    let sleepRecordsData = await fetchSleepRecords();
+
+    // Apply nap filter
+    const skipNaps = $("sleepSkipNaps") ? $("sleepSkipNaps").checked : false;
+    sleepRecordsData = filterNaps(sleepRecordsData, skipNaps);
+
+    // Check if all records were filtered out
+    if (skipNaps && sleepRecordsData.length === 0) {
+      const noticeHTML = '<div class="notice">All sleep records appear to be naps. Uncheck "Skip naps" to see data.</div>';
+      const containers = ["sleepInsightCards", "sleepDeepDiveDuration", "sleepDeepDiveTiming", "weeklyPatternInsights"];
+      containers.forEach(id => {
+        const el = $(id);
+        if (el) el.innerHTML = noticeHTML;
+      });
+      setProgress(100, "No sleep data after nap filtering");
+      return;
+    }
 
     // Validate sleep data quality (DEFENSIVE CODING)
     const validation = validateSleepData(sleepRecordsData);
