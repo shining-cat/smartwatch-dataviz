@@ -2141,6 +2141,108 @@
     return "early";
   }
 
+  /**
+   * Align two time series by date, handling missing values
+   * @param {Object} series1 - {dates: [...], values: [...]}
+   * @param {Object} series2 - {dates: [...], values: [...]}
+   * @param {string} lag - "same_day" | "previous_day"
+   * @returns {Object} {x: [...], y: [...], dates: [...]}
+   */
+  function alignTimeSeries(series1, series2, lag = "same_day") {
+    const x = [], y = [], dates = [];
+
+    // Build maps for fast lookup
+    const map1 = new Map(series1.dates.map((d, i) => [d, series1.values[i]]));
+    const map2 = new Map(series2.dates.map((d, i) => [d, series2.values[i]]));
+
+    if (lag === "same_day") {
+      // Match on same date
+      for (const date of series1.dates) {
+        if (map2.has(date)) {
+          const v1 = map1.get(date);
+          const v2 = map2.get(date);
+          if (v1 != null && v2 != null && !isNaN(v1) && !isNaN(v2)) {
+            x.push(v1);
+            y.push(v2);
+            dates.push(date);
+          }
+        }
+      }
+    } else if (lag === "previous_day") {
+      // Match series1[date-1] with series2[date]
+      const allDates = [...new Set([...series1.dates, ...series2.dates])].sort();
+
+      for (let i = 1; i < allDates.length; i++) {
+        const prevDate = allDates[i - 1];
+        const currDate = allDates[i];
+
+        if (map1.has(prevDate) && map2.has(currDate)) {
+          const v1 = map1.get(prevDate);
+          const v2 = map2.get(currDate);
+          if (v1 != null && v2 != null && !isNaN(v1) && !isNaN(v2)) {
+            x.push(v1);
+            y.push(v2);
+            dates.push(currDate);
+          }
+        }
+      }
+    }
+
+    return { x, y, dates };
+  }
+
+  /**
+   * Define all metric pairs to calculate correlations for
+   * @returns {Array} Array of {independent, dependent, lag, target, label} objects
+   */
+  function defineMetricPairs() {
+    return [
+      // Sleep as target (70% weight)
+      { independent: "aggregates_steps", dependent: "sleep_duration_min", lag: "same_day", target: "sleep", label: "Steps → Sleep Duration" },
+      { independent: "workout_count", dependent: "sleep_duration_min", lag: "same_day", target: "sleep", label: "Workout Count → Sleep Duration" },
+      { independent: "workout_total_duration", dependent: "sleep_duration_min", lag: "same_day", target: "sleep", label: "Workout Duration → Sleep Duration" },
+      { independent: "sleep_duration_min", dependent: "sleep_duration_min", lag: "previous_day", target: "sleep", label: "Sleep → Next Night's Sleep" },
+      { independent: "aggregates_steps", dependent: "sleep_bedtime_min", lag: "same_day", target: "sleep", label: "Steps → Bedtime" },
+      { independent: "workout_count", dependent: "sleep_bedtime_min", lag: "same_day", target: "sleep", label: "Workout Count → Bedtime" },
+
+      // Activity as target (30% weight)
+      { independent: "sleep_duration_min", dependent: "aggregates_steps", lag: "previous_day", target: "activity", label: "Sleep → Steps" },
+      { independent: "sleep_duration_min", dependent: "workout_count", lag: "previous_day", target: "activity", label: "Sleep → Workout Count" },
+      { independent: "sleep_duration_min", dependent: "workout_total_duration", lag: "previous_day", target: "activity", label: "Sleep → Workout Duration" },
+    ];
+  }
+
+  /**
+   * Calculate daily workout aggregates from activity records
+   * @returns {Promise<Object>} {workout_count: {dates, values}, workout_total_duration: {dates, values}}
+   */
+  async function fetchWorkoutAggregates() {
+    const records = await db.activityRecords.toArray();
+
+    // Group by date
+    const dailyMap = new Map();
+
+    for (const record of records) {
+      const date = record.date;
+      if (!dailyMap.has(date)) {
+        dailyMap.set(date, { count: 0, totalDuration: 0 });
+      }
+      const day = dailyMap.get(date);
+      day.count++;
+      day.totalDuration += record.durationMinutes || 0;
+    }
+
+    // Convert to series format
+    const dates = Array.from(dailyMap.keys()).sort();
+    const countValues = dates.map(d => dailyMap.get(d).count);
+    const durationValues = dates.map(d => dailyMap.get(d).totalDuration);
+
+    return {
+      workout_count: { dates, values: countValues },
+      workout_total_duration: { dates, values: durationValues }
+    };
+  }
+
   async function computeSleepInsights(){
     const dur = await fetchDailySeries("sleep_duration_min");
     const bd = await fetchDailySeries("sleep_bedtime_min");
