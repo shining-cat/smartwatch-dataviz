@@ -2082,9 +2082,9 @@
 
   /**
    * Calculate Pearson correlation coefficient between two arrays
-   * @param {Array<number>} x - Independent variable values
-   * @param {Array<number>} y - Dependent variable values
-   * @returns {number|null} Correlation coefficient (-1 to 1), or null if insufficient data
+   * @param {Array<number>} x - Independent variable values (must not contain null/NaN)
+   * @param {Array<number>} y - Dependent variable values (must not contain null/NaN)
+   * @returns {number|null} Correlation coefficient (-1 to 1), or null if insufficient/invalid data
    */
   function calculatePearsonCorrelation(x, y) {
     if (!x || !y || x.length !== y.length || x.length < 14) {
@@ -2095,6 +2095,9 @@
     let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0, sumY2 = 0;
 
     for (let i = 0; i < n; i++) {
+      if (x[i] == null || y[i] == null || isNaN(x[i]) || isNaN(y[i])) {
+        return null; // Invalid data point
+      }
       sumX += x[i];
       sumY += y[i];
       sumXY += x[i] * y[i];
@@ -2118,6 +2121,7 @@
    * @returns {string} "strong" | "moderate" | "weak" | "none"
    */
   function classifyCorrelationStrength(r) {
+    if (r == null || isNaN(r)) return null;
     const absR = Math.abs(r);
     if (absR >= 0.5) return "strong";
     if (absR >= 0.3) return "moderate";
@@ -2131,6 +2135,7 @@
    * @returns {string} "strong" | "moderate" | "early"
    */
   function classifyConfidenceLevel(sampleSize) {
+    if (sampleSize == null || sampleSize < 0 || !Number.isFinite(sampleSize)) return null;
     if (sampleSize >= 60) return "strong";
     if (sampleSize >= 30) return "moderate";
     return "early";
