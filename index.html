@@ -2076,6 +2076,66 @@
   // END SLEEP TIMING PATTERNS COMPONENT
   // ========================================
 
+  // ========================================
+  // CORRELATION ENGINE - STATISTICAL FUNCTIONS
+  // ========================================
+
+  /**
+   * Calculate Pearson correlation coefficient between two arrays
+   * @param {Array<number>} x - Independent variable values
+   * @param {Array<number>} y - Dependent variable values
+   * @returns {number|null} Correlation coefficient (-1 to 1), or null if insufficient data
+   */
+  function calculatePearsonCorrelation(x, y) {
+    if (!x || !y || x.length !== y.length || x.length < 14) {
+      return null; // Need at least 14 data points
+    }
+
+    const n = x.length;
+    let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0, sumY2 = 0;
+
+    for (let i = 0; i < n; i++) {
+      sumX += x[i];
+      sumY += y[i];
+      sumXY += x[i] * y[i];
+      sumX2 += x[i] * x[i];
+      sumY2 += y[i] * y[i];
+    }
+
+    const numerator = (n * sumXY) - (sumX * sumY);
+    const denominator = Math.sqrt((n * sumX2 - sumX * sumX) * (n * sumY2 - sumY * sumY));
+
+    if (denominator === 0) {
+      return null; // Avoid division by zero
+    }
+
+    return numerator / denominator;
+  }
+
+  /**
+   * Classify correlation strength
+   * @param {number} r - Pearson correlation coefficient
+   * @returns {string} "strong" | "moderate" | "weak" | "none"
+   */
+  function classifyCorrelationStrength(r) {
+    const absR = Math.abs(r);
+    if (absR >= 0.5) return "strong";
+    if (absR >= 0.3) return "moderate";
+    if (absR >= 0.15) return "weak";
+    return "none";
+  }
+
+  /**
+   * Classify confidence level based on sample size
+   * @param {number} sampleSize - Number of data points
+   * @returns {string} "strong" | "moderate" | "early"
+   */
+  function classifyConfidenceLevel(sampleSize) {
+    if (sampleSize >= 60) return "strong";
+    if (sampleSize >= 30) return "moderate";
+    return "early";
+  }
+
   async function computeSleepInsights(){
     const dur = await fetchDailySeries("sleep_duration_min");
     const bd = await fetchDailySeries("sleep_bedtime_min");
