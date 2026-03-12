@@ -4081,11 +4081,11 @@
     if ($("tabCorrelation")) $("tabCorrelation").classList.toggle("active", isCorrelation);
 
     // Update content visibility
-    if ($("activityCharts")) $("activityCharts").style.display = isActivity ? "block" : "none";
-    if ($("controlsActivity")) $("controlsActivity").style.display = isActivity ? "block" : "none";
-    if ($("sleepCharts")) $("sleepCharts").style.display = isSleep ? "block" : "none";
-    if ($("controlsSleep")) $("controlsSleep").style.display = isSleep ? "block" : "none";
-    if ($("correlationCharts")) $("correlationCharts").style.display = isCorrelation ? "block" : "none";
+    if ($("activityCharts")) $("activityCharts").style.display = isActivity ? "" : "none";
+    if ($("controlsActivity")) $("controlsActivity").style.display = isActivity ? "" : "none";
+    if ($("sleepCharts")) $("sleepCharts").style.display = isSleep ? "" : "none";
+    if ($("controlsSleep")) $("controlsSleep").style.display = isSleep ? "" : "none";
+    if ($("correlationCharts")) $("correlationCharts").style.display = isCorrelation ? "" : "none";
 
     $("chart").style.display = "none";
     $("chart2").style.display = "none";
