@@ -166,6 +166,7 @@
         <div class="tabs">
           <div class="tab active" id="tabActivity">📊 Activity</div>
           <div class="tab" id="tabSleep">😴 Sleep</div>
+          <div class="tab" id="tabCorrelation">💡 Insights</div>
         </div>
 
         <div id="controlsSleep" style="display:none">
@@ -360,6 +361,49 @@
           <div id="stepsWeeklyChart" class="chart" style="height:240px"></div>
         </div>
 
+      </div>
+
+      <div id="correlationCharts" style="display:none; margin-top:10px;">
+        <!-- Disclaimer Banner -->
+        <div class="card" id="correlationDisclaimer" style="background: rgba(255,191,58,0.08); border: 1px solid rgba(255,191,58,0.25); margin-bottom: 16px;">
+          <div style="display: flex; align-items: start; gap: 12px;">
+            <div style="font-size: 24px;">⚠️</div>
+            <div style="flex: 1;">
+              <h2 style="margin: 0 0 8px 0; color: #ffd68a; font-size: 15px; text-transform: none; letter-spacing: 0;">Remember: Correlation ≠ Causation</h2>
+              <div class="muted" style="line-height: 1.5;">
+                These patterns show relationships in YOUR data, not proof of cause-and-effect. Just because two things happen together doesn't mean one causes the other.
+                <a href="https://en.wikipedia.org/wiki/Correlation_does_not_imply_causation" target="_blank" rel="noopener" style="color: #3aa0ff; text-decoration: none; border-bottom: 1px dotted #3aa0ff;">Learn more</a>
+              </div>
+              <div style="margin-top: 8px; font-style: italic; color: #b8a57d; font-size: 11px;">
+                "Correlation does not imply causation"
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Top Discoveries -->
+        <div class="card" style="margin-bottom: 16px;">
+          <h2 style="margin-bottom: 12px; text-transform: uppercase; letter-spacing: 1px; color: #3aa0ff; font-size: 13px;">✨ Top Discoveries</h2>
+          <div id="correlationTopDiscoveries"></div>
+        </div>
+
+        <!-- Sleep Insights -->
+        <div class="card" style="margin-bottom: 16px;">
+          <h2 style="margin-bottom: 12px; text-transform: uppercase; letter-spacing: 1px; color: #3aa0ff; font-size: 13px;">😴 What Affects Your Sleep</h2>
+          <div id="correlationSleepInsights"></div>
+          <div id="correlationSleepShowMore" style="margin-top: 12px; text-align: center; display: none;">
+            <button id="btnShowMoreSleep" style="font-size: 12px;">Show more patterns ▼</button>
+          </div>
+        </div>
+
+        <!-- Activity Insights -->
+        <div class="card" style="margin-bottom: 16px;">
+          <h2 style="margin-bottom: 12px; text-transform: uppercase; letter-spacing: 1px; color: #3aa0ff; font-size: 13px;">📊 What Drives Your Activity</h2>
+          <div id="correlationActivityInsights"></div>
+          <div id="correlationActivityShowMore" style="margin-top: 12px; text-align: center; display: none;">
+            <button id="btnShowMoreActivity" style="font-size: 12px;">Show more patterns ▼</button>
+          </div>
+        </div>
       </div>
 
       </div>
@@ -582,10 +626,10 @@
 
       if (hasSleep) {
         log("Auto-opening Sleep tab.");
-        setTab("sleep");
+        switchToTab("sleep");
       } else if (hasActivities) {
         log("Auto-opening Activity tab.");
-        setTab("activity");
+        switchToTab("activity");
       }
     } catch(e){ console.error(e); }
     await renderDefault();
@@ -969,11 +1013,11 @@
       const activityCount = await db.activityRecords.count();
       if (activityCount > 0) {
         await populateActivityTypeDropdown();
-        setTab("activity");
+        switchToTab("activity");
       } else {
         const sleepCount = await db.sleepRecords.count();
         if (sleepCount > 0) {
-          setTab("sleep");
+          switchToTab("sleep");
         }
       }
     } catch(e) {
@@ -4014,31 +4058,51 @@
     setProgress(100, "Sleep dashboard ready");
   }
 
+  /**
+   * Render correlation dashboard (stub for now)
+   */
+  async function renderCorrelationDashboard() {
+    console.log("Correlation dashboard render called - stub implementation");
+    const container = $("correlationTopDiscoveries");
+    if (container) {
+      container.innerHTML = '<div style="text-align:center; padding:40px; color:var(--muted);">Correlation engine coming soon...</div>';
+    }
+  }
+
   // Tabs
-  function setTab(tab){
-    const isSleep = tab === "sleep";
-    const isActivity = tab === "activity";
+  function switchToTab(tabName) {
+    const isActivity = tabName === "activity";
+    const isSleep = tabName === "sleep";
+    const isCorrelation = tabName === "correlation";
 
-    if ($("tabSleep")) $("tabSleep").classList.toggle("active", isSleep);
+    // Update tab button states
     if ($("tabActivity")) $("tabActivity").classList.toggle("active", isActivity);
+    if ($("tabSleep")) $("tabSleep").classList.toggle("active", isSleep);
+    if ($("tabCorrelation")) $("tabCorrelation").classList.toggle("active", isCorrelation);
 
-    if ($("controlsSleep")) $("controlsSleep").style.display = isSleep ? "" : "none";
-    if ($("controlsActivity")) $("controlsActivity").style.display = isActivity ? "" : "none";
-
-    if ($("sleepCharts")) $("sleepCharts").style.display = isSleep ? "" : "none";
-    if ($("activityCharts")) $("activityCharts").style.display = isActivity ? "" : "none";
+    // Update content visibility
+    if ($("activityCharts")) $("activityCharts").style.display = isActivity ? "block" : "none";
+    if ($("controlsActivity")) $("controlsActivity").style.display = isActivity ? "block" : "none";
+    if ($("sleepCharts")) $("sleepCharts").style.display = isSleep ? "block" : "none";
+    if ($("controlsSleep")) $("controlsSleep").style.display = isSleep ? "block" : "none";
+    if ($("correlationCharts")) $("correlationCharts").style.display = isCorrelation ? "block" : "none";
 
     $("chart").style.display = "none";
     $("chart2").style.display = "none";
 
-    if (isSleep){
-      renderSleepDashboard().catch(console.error);
-    } else if (isActivity){
+    // Render tab content if needed
+    if (isActivity) {
       renderActivityDashboard().catch(console.error);
+    } else if (isSleep) {
+      renderSleepDashboard().catch(console.error);
+    } else if (isCorrelation) {
+      renderCorrelationDashboard().catch(console.error);
     }
   }
-  if ($("tabSleep")) $("tabSleep").addEventListener("click", ()=>setTab("sleep"));
-  if ($("tabActivity")) $("tabActivity").addEventListener("click", ()=>setTab("activity"));
+
+  if ($("tabActivity")) $("tabActivity").addEventListener("click", () => switchToTab("activity"));
+  if ($("tabSleep")) $("tabSleep").addEventListener("click", () => switchToTab("sleep"));
+  if ($("tabCorrelation")) $("tabCorrelation").addEventListener("click", () => switchToTab("correlation"));
 
   // Sleep filter change handlers
   if ($("sleepRangeSelect")) {
