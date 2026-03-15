@@ -2170,11 +2170,11 @@
       }
     } else if (lag === "previous_day") {
       // Match series1[date-1] with series2[date]
-      const allDates = [...new Set([...series1.dates, ...series2.dates])].sort();
-
-      for (let i = 1; i < allDates.length; i++) {
-        const prevDate = allDates[i - 1];
-        const currDate = allDates[i];
+      for (const currDate of series2.dates) {
+        // Calculate actual previous calendar day
+        const dt = new Date(currDate + "T00:00:00");
+        dt.setDate(dt.getDate() - 1);
+        const prevDate = dt.toISOString().split('T')[0];
 
         if (map1.has(prevDate) && map2.has(currDate)) {
           const v1 = map1.get(prevDate);
@@ -2224,6 +2224,7 @@
 
     for (const record of records) {
       const date = record.date;
+      if (!date) continue; // Skip records with missing dates
       if (!dailyMap.has(date)) {
         dailyMap.set(date, { count: 0, totalDuration: 0 });
       }
