@@ -2246,16 +2246,22 @@
 
   /**
    * Bucket continuous values into low/medium/high based on percentiles
-   * @param {Array<number>} values - Values to bucket
+   * @param {Array<number>} values - Values to bucket (must be valid numbers)
    * @returns {Object|null} {low: {threshold, indices}, medium: {threshold, indices}, high: {threshold, indices}}
    */
   function bucketByPercentile(values) {
     if (!values || values.length < 3) return null;
 
+    // Validate that all values are valid numbers
+    if (values.some(v => v == null || isNaN(v) || typeof v !== 'number')) return null;
+
     // Sort to find percentile thresholds
     const sorted = [...values].sort((a, b) => a - b);
     const p33 = sorted[Math.floor(sorted.length * 0.33)];
     const p67 = sorted[Math.floor(sorted.length * 0.67)];
+
+    // Check for insufficient variation (all values identical)
+    if (p33 === p67) return null;
 
     // Find indices for each bucket
     const lowIndices = [];
@@ -2263,8 +2269,8 @@
     const highIndices = [];
 
     values.forEach((v, i) => {
-      if (v < p33) lowIndices.push(i);
-      else if (v < p67) mediumIndices.push(i);
+      if (v <= p33) lowIndices.push(i);
+      else if (v <= p67) mediumIndices.push(i);
       else highIndices.push(i);
     });
 
@@ -2283,7 +2289,16 @@
    */
   function calculateBucketAverage(values, indices) {
     if (!indices || indices.length === 0) return null;
-    const sum = indices.reduce((acc, i) => acc + values[i], 0);
+    if (!values || values.length === 0) return null;
+
+    const sum = indices.reduce((acc, i) => {
+      // Skip invalid indices or values
+      if (i < 0 || i >= values.length || values[i] == null || isNaN(values[i])) {
+        return acc;
+      }
+      return acc + values[i];
+    }, 0);
+
     return sum / indices.length;
   }
 
