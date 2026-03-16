@@ -2309,11 +2309,13 @@
   async function calculateAllCorrelations() {
     console.log("Calculating correlations...");
 
-    // Fetch all needed metrics
-    const steps = await fetchDailySeries("aggregates_steps");
-    const sleepDuration = await fetchDailySeries("sleep_duration_min");
-    const bedtime = await fetchDailySeries("sleep_bedtime_min");
-    const workoutAggregates = await fetchWorkoutAggregates();
+    // Fetch all needed metrics (parallel for better performance)
+    const [steps, sleepDuration, bedtime, workoutAggregates] = await Promise.all([
+      fetchDailySeries("aggregates_steps"),
+      fetchDailySeries("sleep_duration_min"),
+      fetchDailySeries("sleep_bedtime_min"),
+      fetchWorkoutAggregates()
+    ]);
 
     const metricsData = {
       "aggregates_steps": steps,
@@ -2360,6 +2362,12 @@
 
       // Calculate bucket statistics
       const buckets = bucketByPercentile(aligned.x);
+
+      if (!buckets) {
+        console.log(`Skipping ${pair.label}: bucketing failed`);
+        continue;
+      }
+
       const bucketStats = {
         low: {
           threshold: buckets.low.threshold,
@@ -2378,11 +2386,14 @@
         }
       };
 
-      // Build scatter data
+      // Build scatter data (use Set for O(1) bucket lookup)
+      const mediumSet = new Set(buckets.medium.indices);
+      const highSet = new Set(buckets.high.indices);
+
       const scatterData = aligned.x.map((xVal, i) => {
         let bucket = "low";
-        if (buckets.medium.indices.includes(i)) bucket = "medium";
-        if (buckets.high.indices.includes(i)) bucket = "high";
+        if (mediumSet.has(i)) bucket = "medium";
+        if (highSet.has(i)) bucket = "high";
 
         return { x: xVal, y: aligned.y[i], date: aligned.dates[i], bucket };
       });
