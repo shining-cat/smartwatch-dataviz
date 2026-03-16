@@ -2425,6 +2425,215 @@
     return correlations;
   }
 
+  // --------------------------
+  // Pattern Card Rendering (Task 6)
+  // --------------------------
+
+  /**
+   * Format confidence badge HTML
+   * @param {string} confidence - "strong" | "moderate" | "early"
+   * @param {number} sampleSize - Number of data points
+   * @returns {string} HTML string
+   */
+  function formatConfidenceBadge(confidence, sampleSize) {
+    const badges = {
+      strong: { icon: "🟢", label: "Strong confidence", color: "#3dce79" },
+      moderate: { icon: "🟡", label: "Moderate confidence", color: "#ffbf3a" },
+      early: { icon: "🟠", label: "Early pattern", color: "#ff8c42" }
+    };
+
+    const badge = badges[confidence];
+    return `<span style="background: rgba(${confidence === 'strong' ? '61, 206, 121' : confidence === 'moderate' ? '255, 191, 58' : '255, 140, 66'}, 0.15);
+                       border: 1px solid ${badge.color};
+                       color: ${badge.color};
+                       padding: 4px 10px;
+                       border-radius: 12px;
+                       font-size: 11px;
+                       font-weight: 600;
+                       letter-spacing: 0.3px;"
+                title="${badge.label}: ${sampleSize} days of data">
+            ${badge.icon} ${badge.label}: ${sampleSize} days
+          </span>`;
+  }
+
+  /**
+   * Format relationship indicator HTML
+   * @param {string} strength - "strong" | "moderate" | "weak"
+   * @param {string} direction - "positive" | "negative"
+   * @returns {string} HTML string
+   */
+  function formatRelationshipIndicator(strength, direction) {
+    const indicators = {
+      "strong-positive": { icon: "🟢", label: "Strong positive relationship", color: "#3dce79" },
+      "moderate-positive": { icon: "🟡", label: "Moderate positive relationship", color: "#ffbf3a" },
+      "weak-positive": { icon: "🟠", label: "Weak positive relationship", color: "#ff8c42" },
+      "strong-negative": { icon: "🔴", label: "Strong negative relationship", color: "#ff5a6b" },
+      "moderate-negative": { icon: "🟠", label: "Moderate negative relationship", color: "#ff8c42" },
+      "weak-negative": { icon: "⚪", label: "Weak negative relationship", color: "#9fb0c3" }
+    };
+
+    const key = `${strength}-${direction}`;
+    const indicator = indicators[key];
+
+    return `<div style="display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: ${indicator.color};">
+            <span style="font-size: 18px;">${indicator.icon}</span>
+            <span style="font-weight: 600;">${indicator.label}</span>
+          </div>`;
+  }
+
+  /**
+   * Get human-readable label for metric
+   * @param {string} metric - Metric key
+   * @returns {string} Label
+   */
+  function getMetricLabel(metric) {
+    const labels = {
+      "aggregates_steps": "steps",
+      "sleep_duration_min": "sleep duration",
+      "sleep_bedtime_min": "bedtime",
+      "workout_count": "workouts",
+      "workout_total_duration": "workout time"
+    };
+    return labels[metric] || metric;
+  }
+
+  /**
+   * Format value with appropriate units
+   * @param {string} metric - Metric key
+   * @param {number} value - Value to format
+   * @returns {string} Formatted value with units
+   */
+  function formatMetricValue(metric, value) {
+    if (metric === "sleep_duration_min") {
+      const hours = Math.floor(value / 60);
+      const mins = Math.round(value % 60);
+      return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
+    }
+    if (metric === "sleep_bedtime_min") {
+      const hours = Math.floor(value / 60);
+      const mins = Math.round(value % 60);
+      return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
+    }
+    if (metric === "workout_total_duration") {
+      return `${Math.round(value)} min`;
+    }
+    if (metric === "workout_count") {
+      return `${value.toFixed(1)} workouts`;
+    }
+    return Math.round(value).toLocaleString();
+  }
+
+  /**
+   * Render a single correlation pattern card
+   * @param {Object} correlation - Correlation object
+   * @param {boolean} isTopDiscovery - Whether this is in top discoveries section
+   * @returns {string} HTML string
+   */
+  function renderPatternCard(correlation, isTopDiscovery = false) {
+    const { label, r, strength, direction, confidence, sampleSize, buckets, independent, dependent } = correlation;
+
+    // Defensive: check for null/invalid bucket averages
+    if (!buckets || buckets.low.avg == null || buckets.medium.avg == null || buckets.high.avg == null) {
+      console.warn("Invalid bucket data for correlation:", label);
+      return `<div style="padding: 16px; color: var(--muted);">Unable to render pattern card: insufficient data</div>`;
+    }
+
+    // Generate plain English summary
+    const indLabel = getMetricLabel(independent);
+    const depLabel = getMetricLabel(dependent);
+    const highAvg = formatMetricValue(dependent, buckets.high.avg);
+    const lowAvg = formatMetricValue(dependent, buckets.low.avg);
+    const diff = Math.abs(buckets.high.avg - buckets.low.avg);
+    const diffFormatted = formatMetricValue(dependent, diff);
+    const highThreshold = formatMetricValue(independent, buckets.high.threshold[0]);
+
+    const relationshipText = direction === "positive"
+      ? `On your high ${indLabel} days (>${highThreshold}), you average ${highAvg} ${depLabel} — that's ${diffFormatted} more than low ${indLabel} days (${lowAvg})`
+      : `On your high ${indLabel} days (>${highThreshold}), you average ${highAvg} ${depLabel} — that's ${diffFormatted} less than low ${indLabel} days (${lowAvg})`;
+
+    // Calculate bar widths (relative to max) - defensive check for division by zero
+    const maxAvg = Math.max(buckets.low.avg, buckets.medium.avg, buckets.high.avg);
+    const lowWidth = maxAvg > 0 ? (buckets.low.avg / maxAvg) * 100 : 0;
+    const medWidth = maxAvg > 0 ? (buckets.medium.avg / maxAvg) * 100 : 0;
+    const highWidth = maxAvg > 0 ? (buckets.high.avg / maxAvg) * 100 : 0;
+
+    const cardStyle = isTopDiscovery
+      ? `border: 2px solid rgba(58, 160, 255, 0.3); background: rgba(58, 160, 255, 0.05);`
+      : ``;
+
+    return `
+    <div class="correlation-pattern-card" style="background: #0f1521; border: 1px solid #223046; border-radius: 12px; padding: 16px; margin-bottom: 12px; ${cardStyle}">
+      <!-- Header -->
+      <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 12px; gap: 12px;">
+        <div style="flex: 1;">
+          <div style="font-size: 15px; font-weight: 700; color: var(--fg); margin-bottom: 8px;">
+            ${label}
+          </div>
+          ${formatConfidenceBadge(confidence, sampleSize)}
+        </div>
+      </div>
+
+      <!-- Plain English Summary -->
+      <div style="font-size: 14px; color: var(--fg); line-height: 1.5; margin-bottom: 12px; background: rgba(255,255,255,0.02); padding: 12px; border-radius: 8px;">
+        ${relationshipText}
+      </div>
+
+      <!-- Relationship Indicator -->
+      <div style="margin-bottom: 16px;">
+        ${formatRelationshipIndicator(strength, direction)}
+      </div>
+
+      <!-- Summary Bars -->
+      <div style="margin-bottom: 12px;">
+        <div style="font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px;">
+          Comparison by ${indLabel} level
+        </div>
+
+        <!-- Low bucket -->
+        <div style="margin-bottom: 8px;">
+          <div style="display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-bottom: 3px;">
+            <span title="Your lowest third of days for this metric">Low (${formatMetricValue(independent, buckets.low.threshold[0])}–${formatMetricValue(independent, buckets.low.threshold[1])})</span>
+            <span style="font-weight: 600; color: var(--fg);">${formatMetricValue(dependent, buckets.low.avg)} avg</span>
+          </div>
+          <div style="background: #0b1018; border-radius: 4px; height: 20px; overflow: hidden;">
+            <div style="background: linear-gradient(90deg, #3a5a7f, #2a4a6f); height: 100%; width: ${lowWidth}%;"></div>
+          </div>
+        </div>
+
+        <!-- Medium bucket -->
+        <div style="margin-bottom: 8px;">
+          <div style="display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-bottom: 3px;">
+            <span title="Your typical/average days">Medium (${formatMetricValue(independent, buckets.medium.threshold[0])}–${formatMetricValue(independent, buckets.medium.threshold[1])})</span>
+            <span style="font-weight: 600; color: var(--fg);">${formatMetricValue(dependent, buckets.medium.avg)} avg</span>
+          </div>
+          <div style="background: #0b1018; border-radius: 4px; height: 20px; overflow: hidden;">
+            <div style="background: linear-gradient(90deg, #5a8abf, #4a7aaf); height: 100%; width: ${medWidth}%;"></div>
+          </div>
+        </div>
+
+        <!-- High bucket -->
+        <div style="margin-bottom: 8px;">
+          <div style="display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-bottom: 3px;">
+            <span title="Your best third of days for this metric">High (${formatMetricValue(independent, buckets.high.threshold[0])}–${formatMetricValue(independent, buckets.high.threshold[1])})</span>
+            <span style="font-weight: 600; color: var(--fg);">${formatMetricValue(dependent, buckets.high.avg)} avg</span>
+          </div>
+          <div style="background: #0b1018; border-radius: 4px; height: 20px; overflow: hidden;">
+            <div style="background: linear-gradient(90deg, #3aa0ff, #3dce79); height: 100%; width: ${highWidth}%;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Scatter plot (collapsible) -->
+      <div>
+        <button class="btn-show-scatter" data-correlation-id="${correlation.id}" style="font-size: 12px; padding: 6px 12px; width: 100%;">
+          Show scatter plot ▼
+        </button>
+        <div id="scatter-${correlation.id}" style="display: none; height: 300px; margin-top: 12px;"></div>
+      </div>
+    </div>
+  `;
+  }
+
   async function computeSleepInsights(){
     const dur = await fetchDailySeries("sleep_duration_min");
     const bd = await fetchDailySeries("sleep_bedtime_min");
