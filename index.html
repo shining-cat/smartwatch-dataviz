@@ -2302,6 +2302,118 @@
     return sum / indices.length;
   }
 
+  /**
+   * Calculate all correlations for defined metric pairs
+   * @returns {Promise<Array>} Array of correlation objects
+   */
+  async function calculateAllCorrelations() {
+    console.log("Calculating correlations...");
+
+    // Fetch all needed metrics
+    const steps = await fetchDailySeries("aggregates_steps");
+    const sleepDuration = await fetchDailySeries("sleep_duration_min");
+    const bedtime = await fetchDailySeries("sleep_bedtime_min");
+    const workoutAggregates = await fetchWorkoutAggregates();
+
+    const metricsData = {
+      "aggregates_steps": steps,
+      "sleep_duration_min": sleepDuration,
+      "sleep_bedtime_min": bedtime,
+      "workout_count": workoutAggregates.workout_count,
+      "workout_total_duration": workoutAggregates.workout_total_duration
+    };
+
+    const pairs = defineMetricPairs();
+    const correlations = [];
+
+    for (const pair of pairs) {
+      const indData = metricsData[pair.independent];
+      const depData = metricsData[pair.dependent];
+
+      if (!indData || !depData || indData.values.length === 0 || depData.values.length === 0) {
+        console.log(`Skipping ${pair.label}: missing data`);
+        continue;
+      }
+
+      // Align time series
+      const aligned = alignTimeSeries(indData, depData, pair.lag);
+
+      if (aligned.x.length < 14) {
+        console.log(`Skipping ${pair.label}: only ${aligned.x.length} overlapping days`);
+        continue;
+      }
+
+      // Calculate correlation
+      const r = calculatePearsonCorrelation(aligned.x, aligned.y);
+
+      if (r === null) {
+        console.log(`Skipping ${pair.label}: correlation calculation failed`);
+        continue;
+      }
+
+      const strength = classifyCorrelationStrength(r);
+
+      if (strength === "none") {
+        console.log(`Skipping ${pair.label}: correlation too weak (r=${r.toFixed(3)})`);
+        continue;
+      }
+
+      // Calculate bucket statistics
+      const buckets = bucketByPercentile(aligned.x);
+      const bucketStats = {
+        low: {
+          threshold: buckets.low.threshold,
+          avg: calculateBucketAverage(aligned.y, buckets.low.indices),
+          count: buckets.low.indices.length
+        },
+        medium: {
+          threshold: buckets.medium.threshold,
+          avg: calculateBucketAverage(aligned.y, buckets.medium.indices),
+          count: buckets.medium.indices.length
+        },
+        high: {
+          threshold: buckets.high.threshold,
+          avg: calculateBucketAverage(aligned.y, buckets.high.indices),
+          count: buckets.high.indices.length
+        }
+      };
+
+      // Build scatter data
+      const scatterData = aligned.x.map((xVal, i) => {
+        let bucket = "low";
+        if (buckets.medium.indices.includes(i)) bucket = "medium";
+        if (buckets.high.indices.includes(i)) bucket = "high";
+
+        return { x: xVal, y: aligned.y[i], date: aligned.dates[i], bucket };
+      });
+
+      const correlation = {
+        id: `${pair.independent}_to_${pair.dependent}_${pair.lag}`,
+        label: pair.label,
+        independent: pair.independent,
+        dependent: pair.dependent,
+        lag: pair.lag,
+        target: pair.target,
+        r: r,
+        strength: strength,
+        direction: r >= 0 ? "positive" : "negative",
+        sampleSize: aligned.x.length,
+        confidence: classifyConfidenceLevel(aligned.x.length),
+        buckets: bucketStats,
+        scatterData: scatterData
+      };
+
+      correlations.push(correlation);
+      console.log(`✓ ${pair.label}: r=${r.toFixed(3)}, ${strength} ${correlation.direction}, n=${aligned.x.length}`);
+    }
+
+    // Sort by absolute correlation strength
+    correlations.sort((a, b) => Math.abs(b.r) - Math.abs(a.r));
+
+    console.log(`Calculated ${correlations.length} correlations`);
+    return correlations;
+  }
+
   async function computeSleepInsights(){
     const dur = await fetchDailySeries("sleep_duration_min");
     const bd = await fetchDailySeries("sleep_bedtime_min");
