@@ -2244,6 +2244,49 @@
     };
   }
 
+  /**
+   * Bucket continuous values into low/medium/high based on percentiles
+   * @param {Array<number>} values - Values to bucket
+   * @returns {Object|null} {low: {threshold, indices}, medium: {threshold, indices}, high: {threshold, indices}}
+   */
+  function bucketByPercentile(values) {
+    if (!values || values.length < 3) return null;
+
+    // Sort to find percentile thresholds
+    const sorted = [...values].sort((a, b) => a - b);
+    const p33 = sorted[Math.floor(sorted.length * 0.33)];
+    const p67 = sorted[Math.floor(sorted.length * 0.67)];
+
+    // Find indices for each bucket
+    const lowIndices = [];
+    const mediumIndices = [];
+    const highIndices = [];
+
+    values.forEach((v, i) => {
+      if (v < p33) lowIndices.push(i);
+      else if (v < p67) mediumIndices.push(i);
+      else highIndices.push(i);
+    });
+
+    return {
+      low: { threshold: [sorted[0], p33], indices: lowIndices },
+      medium: { threshold: [p33, p67], indices: mediumIndices },
+      high: { threshold: [p67, sorted[sorted.length - 1]], indices: highIndices }
+    };
+  }
+
+  /**
+   * Calculate average value for indices
+   * @param {Array<number>} values - All values
+   * @param {Array<number>} indices - Indices to average
+   * @returns {number|null} Average value
+   */
+  function calculateBucketAverage(values, indices) {
+    if (!indices || indices.length === 0) return null;
+    const sum = indices.reduce((acc, i) => acc + values[i], 0);
+    return sum / indices.length;
+  }
+
   async function computeSleepInsights(){
     const dur = await fetchDailySeries("sleep_duration_min");
     const bd = await fetchDailySeries("sleep_bedtime_min");
