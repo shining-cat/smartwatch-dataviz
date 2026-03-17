@@ -4,12 +4,47 @@ Privacy-first health data visualization tool that runs entirely in your browser.
 
 ## Features
 
-- **Timeline Dashboard:** Multi-metric time series with rolling averages and normalization
-- **Weekly Seasonality:** Calendar heatmap and weekday pattern analysis
-- **Sleep Deep Dive:** Comprehensive sleep analysis with three components:
-  - **Duration Analysis:** Sleep duration distribution, averages, consistency scoring, and healthy range highlighting
-  - **Timing Patterns:** Bedtime/wake time consistency, chronotype detection (early-bird/night-owl/intermediate)
-  - **Weekly Patterns:** Weekday effects, weekend vs weekday comparison, recurring pattern insights
+### 📊 Activity Dashboard
+- **Daily Steps:** Time series visualization with weekly patterns and trend indicators
+- **Workout Overview:**
+  - Activity type distribution (running, cycling, swimming, etc.)
+  - Workout frequency and duration trends
+  - Calendar heatmap showing workout intensity over time
+- **Weekly Patterns:** Weekday vs weekend activity comparisons
+- **Distance & Elevation:** Total metrics with visual breakdowns
+
+### 😴 Sleep Analysis
+- **Duration Tracking:** Sleep duration trends, averages, and healthy range indicators
+- **Timing Patterns:** Bedtime and wake time consistency with chronotype detection
+- **Weekly Insights:** Weekday effects and recurring pattern analysis
+- **Nap Filtering:** Toggle to include/exclude naps from analysis
+- **Visual Indicators:** Color-coded duration charts and comparison bars
+
+### 💡 Correlation Discovery (Insights)
+- **Pattern Detection:** Analyzes 9 metric pairs to find relationships between sleep and activity
+- **Smart Organization:**
+  - Top 3 strongest discoveries highlighted
+  - Sleep-focused insights (70% weight)
+  - Activity insights (30% weight)
+- **Statistical Rigor:**
+  - Pearson correlation with confidence indicators
+  - Percentile-based comparisons (Low/Medium/High)
+  - Minimum 14 days of overlapping data required
+- **Interactive Visualizations:** Expandable scatter plots with trend lines
+- **Transparent Results:** Shows all calculations even when patterns are weak
+- **Educational Context:** "Correlation ≠ Causation" disclaimer and research insights
+
+### 📈 Timeline Dashboard
+- Multi-metric time series with rolling averages and normalization
+
+## Recent Enhancements
+
+**March 2026:**
+- ✨ **New: Correlation Discovery Engine** - Automatically finds patterns between sleep and activity
+- ✨ **New: Activity Dashboard** - Comprehensive workout and step tracking with weekly patterns
+- 🔧 **Enhanced: Sleep Analysis** - Added nap filtering, improved chronotype detection, visual indicators
+- 📊 **Improved: Data Visualization** - Interactive scatter plots, calendar heatmaps, trend indicators
+- 🎨 **UX: Transparent Results** - Shows analysis details even when correlations are weak
 
 ## How to Use
 
@@ -26,8 +61,9 @@ Privacy-first health data visualization tool that runs entirely in your browser.
    - Or click "Choose ZIP" to select the file
 
 4. **Explore your health data**
-   - Switch between Timeline, Seasonality, and Sleep tabs
-   - Select metrics to visualize
+   - Switch between Activity, Sleep, Insights, and Timeline tabs
+   - Toggle nap filtering in Sleep tab
+   - Discover correlations between your metrics in Insights tab
    - All processing happens locally in your browser
 
 ## Privacy & Data Safety
