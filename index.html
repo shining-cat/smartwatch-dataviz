@@ -2860,6 +2860,75 @@
     }
   });
 
+  /**
+   * Select top N correlations and deduplicate from category sections
+   * @param {Array} correlations - All correlations
+   * @param {number} topN - Number of top discoveries to show
+   * @returns {Object} {topDiscoveries, sleepInsights, activityInsights}
+   */
+  function organizeCorrelations(correlations, topN = 3) {
+    // Filter out weak correlations with early confidence
+    const qualityCorrelations = correlations.filter(c => {
+      if (c.confidence === 'early' && c.strength === 'weak') return false;
+      return true;
+    });
+
+    // Get top N strongest correlations
+    const topDiscoveries = qualityCorrelations.slice(0, topN);
+    const topIds = new Set(topDiscoveries.map(c => c.id));
+
+    // Separate remaining by target
+    const remaining = qualityCorrelations.filter(c => !topIds.has(c.id));
+
+    const sleepInsights = remaining.filter(c => c.target === 'sleep');
+    const activityInsights = remaining.filter(c => c.target === 'activity');
+
+    // Further separate by strength
+    const organizeSectionByStrength = (insights) => {
+      const strong = insights.filter(c => c.strength === 'strong' || c.strength === 'moderate');
+      const moderate = insights.filter(c => c.strength === 'weak');
+      return { strong, moderate };
+    };
+
+    return {
+      topDiscoveries,
+      sleepInsights: organizeSectionByStrength(sleepInsights),
+      activityInsights: organizeSectionByStrength(activityInsights)
+    };
+  }
+
+  /**
+   * Render educational fallback when no correlations found
+   * @param {number} minDaysNeeded - Days needed to unlock correlations
+   * @returns {string} HTML string
+   */
+  function renderEducationalFallback(minDaysNeeded = 14) {
+    return `
+      <div style="text-align: center; padding: 40px 20px; background: rgba(58, 160, 255, 0.05); border-radius: 12px; border: 1px solid rgba(58, 160, 255, 0.15);">
+        <div style="font-size: 48px; margin-bottom: 16px;">📚</div>
+        <div style="font-size: 18px; font-weight: 700; color: var(--fg); margin-bottom: 12px;">
+          Building Your Personal Insights
+        </div>
+        <div class="muted" style="max-width: 500px; margin: 0 auto 20px; line-height: 1.6;">
+          You need at least ${minDaysNeeded} days of overlapping data to discover patterns.
+          Keep tracking sleep and activity to unlock your personalized discoveries!
+        </div>
+
+        <div style="background: rgba(255,255,255,0.02); border-radius: 12px; padding: 20px; max-width: 600px; margin: 0 auto; text-align: left;">
+          <div style="font-size: 14px; font-weight: 600; color: var(--fg); margin-bottom: 12px;">
+            While you're tracking, here's what research shows:
+          </div>
+          <div class="muted" style="font-size: 13px; line-height: 1.7;">
+            • Regular exercise generally improves sleep quality<br/>
+            • Consistent sleep schedules help maintain energy levels<br/>
+            • Physical activity during the day helps regulate circadian rhythm<br/>
+            • Getting enough sleep supports better workout performance
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
   async function computeSleepInsights(){
     const dur = await fetchDailySeries("sleep_duration_min");
     const bd = await fetchDailySeries("sleep_bedtime_min");
@@ -4843,13 +4912,117 @@
   }
 
   /**
-   * Render correlation dashboard (stub for now)
+   * Main correlation dashboard rendering function
    */
   async function renderCorrelationDashboard() {
-    console.log("Correlation dashboard render called - stub implementation");
-    const container = $("correlationTopDiscoveries");
-    if (container) {
-      container.innerHTML = '<div style="text-align:center; padding:40px; color:var(--muted);">Correlation engine coming soon...</div>';
+    console.log("Rendering correlation dashboard...");
+
+    // Show loading state
+    const topContainer = $("correlationTopDiscoveries");
+    const sleepContainer = $("correlationSleepInsights");
+    const activityContainer = $("correlationActivityInsights");
+
+    if (topContainer) topContainer.innerHTML = '<div style="text-align:center; padding:40px; color:var(--muted);">Analyzing your patterns...</div>';
+    if (sleepContainer) sleepContainer.innerHTML = '';
+    if (activityContainer) activityContainer.innerHTML = '';
+
+    try {
+      // Calculate all correlations
+      const correlations = await calculateAllCorrelations();
+
+      // Cache for scatter plot access
+      window.cachedCorrelations = correlations;
+
+      // Check if we have any correlations
+      if (correlations.length === 0) {
+        if (topContainer) {
+          topContainer.innerHTML = renderEducationalFallback(14);
+        }
+        if (sleepContainer) sleepContainer.innerHTML = '';
+        if (activityContainer) activityContainer.innerHTML = '';
+        return;
+      }
+
+      // Organize correlations
+      const organized = organizeCorrelations(correlations, 3);
+
+      // Render top discoveries
+      if (organized.topDiscoveries.length > 0) {
+        const topHtml = organized.topDiscoveries.map(c => renderPatternCard(c, true)).join('');
+        if (topContainer) topContainer.innerHTML = topHtml;
+      } else {
+        if (topContainer) topContainer.innerHTML = renderEducationalFallback(14);
+      }
+
+      // Render sleep insights
+      if (organized.sleepInsights.strong.length > 0) {
+        const sleepHtml = organized.sleepInsights.strong.map(c => renderPatternCard(c, false)).join('');
+        if (sleepContainer) sleepContainer.innerHTML = sleepHtml;
+
+        // Show "show more" if moderate patterns exist
+        if (organized.sleepInsights.moderate.length > 0) {
+          const showMoreContainer = $("correlationSleepShowMore");
+          if (showMoreContainer) {
+            showMoreContainer.style.display = 'block';
+            const btn = $("btnShowMoreSleep");
+            if (btn) {
+              btn.onclick = () => {
+                const moderateHtml = organized.sleepInsights.moderate.map(c => renderPatternCard(c, false)).join('');
+                if (sleepContainer) sleepContainer.innerHTML += moderateHtml;
+                showMoreContainer.style.display = 'none';
+              };
+            }
+          }
+        }
+      } else if (organized.sleepInsights.moderate.length > 0) {
+        // Only weak patterns available - show educational fallback first
+        if (sleepContainer) {
+          sleepContainer.innerHTML = renderEducationalFallback(30) + '<div style="margin-top: 20px;"></div>';
+          const weakHtml = organized.sleepInsights.moderate.map(c => renderPatternCard(c, false)).join('');
+          sleepContainer.innerHTML += `<div style="opacity: 0.7;">${weakHtml}</div>`;
+        }
+      } else {
+        if (sleepContainer) sleepContainer.innerHTML = '<div class="muted" style="text-align:center; padding:20px;">Keep tracking to unlock sleep insights</div>';
+      }
+
+      // Render activity insights
+      if (organized.activityInsights.strong.length > 0) {
+        const activityHtml = organized.activityInsights.strong.map(c => renderPatternCard(c, false)).join('');
+        if (activityContainer) activityContainer.innerHTML = activityHtml;
+
+        // Show "show more" if moderate patterns exist
+        if (organized.activityInsights.moderate.length > 0) {
+          const showMoreContainer = $("correlationActivityShowMore");
+          if (showMoreContainer) {
+            showMoreContainer.style.display = 'block';
+            const btn = $("btnShowMoreActivity");
+            if (btn) {
+              btn.onclick = () => {
+                const moderateHtml = organized.activityInsights.moderate.map(c => renderPatternCard(c, false)).join('');
+                if (activityContainer) activityContainer.innerHTML += moderateHtml;
+                showMoreContainer.style.display = 'none';
+              };
+            }
+          }
+        }
+      } else if (organized.activityInsights.moderate.length > 0) {
+        // Only weak patterns - show educational fallback first
+        if (activityContainer) {
+          activityContainer.innerHTML = renderEducationalFallback(30) + '<div style="margin-top: 20px;"></div>';
+          const weakHtml = organized.activityInsights.moderate.map(c => renderPatternCard(c, false)).join('');
+          activityContainer.innerHTML += `<div style="opacity: 0.7;">${weakHtml}</div>`;
+        }
+      } else {
+        if (activityContainer) activityContainer.innerHTML = '<div class="muted" style="text-align:center; padding:20px;">Keep tracking to unlock activity insights</div>';
+      }
+
+      console.log("Correlation dashboard rendered");
+
+    } catch (error) {
+      console.error("Error rendering correlation dashboard:", error);
+      if (topContainer) {
+        topContainer.innerHTML = `<div style="text-align:center; padding:40px; color:var(--bad);">Error loading insights. Check console for details.</div>`;
+      }
     }
   }
 
