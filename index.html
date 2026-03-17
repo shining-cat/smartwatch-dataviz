@@ -2867,6 +2867,15 @@
    * @returns {Object} {topDiscoveries, sleepInsights, activityInsights}
    */
   function organizeCorrelations(correlations, topN = 3) {
+    if (!correlations || !Array.isArray(correlations)) {
+      console.warn("organizeCorrelations called with invalid input");
+      return {
+        topDiscoveries: [],
+        sleepInsights: { strong: [], weak: [] },
+        activityInsights: { strong: [], weak: [] }
+      };
+    }
+
     // Filter out weak correlations with early confidence
     const qualityCorrelations = correlations.filter(c => {
       if (c.confidence === 'early' && c.strength === 'weak') return false;
@@ -2886,8 +2895,8 @@
     // Further separate by strength
     const organizeSectionByStrength = (insights) => {
       const strong = insights.filter(c => c.strength === 'strong' || c.strength === 'moderate');
-      const moderate = insights.filter(c => c.strength === 'weak');
-      return { strong, moderate };
+      const weak = insights.filter(c => c.strength === 'weak');
+      return { strong, weak };
     };
 
     return {
@@ -4959,26 +4968,26 @@
         const sleepHtml = organized.sleepInsights.strong.map(c => renderPatternCard(c, false)).join('');
         if (sleepContainer) sleepContainer.innerHTML = sleepHtml;
 
-        // Show "show more" if moderate patterns exist
-        if (organized.sleepInsights.moderate.length > 0) {
+        // Show "show more" if weak patterns exist
+        if (organized.sleepInsights.weak.length > 0) {
           const showMoreContainer = $("correlationSleepShowMore");
           if (showMoreContainer) {
             showMoreContainer.style.display = 'block';
             const btn = $("btnShowMoreSleep");
             if (btn) {
               btn.onclick = () => {
-                const moderateHtml = organized.sleepInsights.moderate.map(c => renderPatternCard(c, false)).join('');
-                if (sleepContainer) sleepContainer.innerHTML += moderateHtml;
+                const weakHtml = organized.sleepInsights.weak.map(c => renderPatternCard(c, false)).join('');
+                if (sleepContainer) sleepContainer.innerHTML += weakHtml;
                 showMoreContainer.style.display = 'none';
               };
             }
           }
         }
-      } else if (organized.sleepInsights.moderate.length > 0) {
+      } else if (organized.sleepInsights.weak.length > 0) {
         // Only weak patterns available - show educational fallback first
         if (sleepContainer) {
           sleepContainer.innerHTML = renderEducationalFallback(30) + '<div style="margin-top: 20px;"></div>';
-          const weakHtml = organized.sleepInsights.moderate.map(c => renderPatternCard(c, false)).join('');
+          const weakHtml = organized.sleepInsights.weak.map(c => renderPatternCard(c, false)).join('');
           sleepContainer.innerHTML += `<div style="opacity: 0.7;">${weakHtml}</div>`;
         }
       } else {
@@ -4990,26 +4999,26 @@
         const activityHtml = organized.activityInsights.strong.map(c => renderPatternCard(c, false)).join('');
         if (activityContainer) activityContainer.innerHTML = activityHtml;
 
-        // Show "show more" if moderate patterns exist
-        if (organized.activityInsights.moderate.length > 0) {
+        // Show "show more" if weak patterns exist
+        if (organized.activityInsights.weak.length > 0) {
           const showMoreContainer = $("correlationActivityShowMore");
           if (showMoreContainer) {
             showMoreContainer.style.display = 'block';
             const btn = $("btnShowMoreActivity");
             if (btn) {
               btn.onclick = () => {
-                const moderateHtml = organized.activityInsights.moderate.map(c => renderPatternCard(c, false)).join('');
-                if (activityContainer) activityContainer.innerHTML += moderateHtml;
+                const weakHtml = organized.activityInsights.weak.map(c => renderPatternCard(c, false)).join('');
+                if (activityContainer) activityContainer.innerHTML += weakHtml;
                 showMoreContainer.style.display = 'none';
               };
             }
           }
         }
-      } else if (organized.activityInsights.moderate.length > 0) {
+      } else if (organized.activityInsights.weak.length > 0) {
         // Only weak patterns - show educational fallback first
         if (activityContainer) {
           activityContainer.innerHTML = renderEducationalFallback(30) + '<div style="margin-top: 20px;"></div>';
-          const weakHtml = organized.activityInsights.moderate.map(c => renderPatternCard(c, false)).join('');
+          const weakHtml = organized.activityInsights.weak.map(c => renderPatternCard(c, false)).join('');
           activityContainer.innerHTML += `<div style="opacity: 0.7;">${weakHtml}</div>`;
         }
       } else {
