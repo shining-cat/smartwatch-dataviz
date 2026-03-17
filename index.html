@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Withings Local Viz</title>
+  <title>Smartwatch Data Viz</title>
   <style>
     :root { --bg:#0b0f14; --card:#121824; --muted:#9fb0c3; --fg:#e7eef7; --accent:#3aa0ff; --good:#3dce79; --warn:#ffbf3a; --bad:#ff5a6b; }
     * { box-sizing: border-box; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; }
@@ -110,7 +110,7 @@
 </head>
 <body>
   <header>
-    <h1>Withings Local Viz</h1>
+    <h1>Smartwatch Data Viz</h1>
     <span class="pill">privacy-first • runs entirely in your browser</span>
     <span class="pill" id="statusPill">no data loaded</span>
   </header>
@@ -130,7 +130,7 @@
         <div id="debugDetails" style="display:none; margin-top:12px">
           <h2>Load data</h2>
           <div id="drop" class="drop">
-            <strong>Drop your Withings export ZIP here</strong>
+            <strong>Drop your smartwatch health export ZIP here</strong>
             <div class="muted">or choose a file. Everything stays on this device.</div>
           </div>
 
@@ -488,7 +488,7 @@
   const HR_MAX_BPM = 250; // Allow high values for intense athletic activity
 
   // IndexedDB
-  const db = new Dexie("withingsLocalViz");
+  const db = new Dexie("smartwatchDataViz");
   db.version(1).stores({
     daily: "[metric+date], metric, date",
     meta: "key"
@@ -860,7 +860,7 @@
           let value = null;
 
           if (lower === "sleep.csv"){
-            // Withings sleep.csv columns are typically:
+            // Sleep CSV columns are typically:
             // from,to,"light (s)","deep (s)","rem (s)","awake (s)",...
             // We derive a daily sleep duration in minutes using (to - from).
             const fromRaw = r.from ?? r["from"];
@@ -1218,7 +1218,7 @@
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "withings_patched_dataset.json";
+    a.download = "health_data_export.json";
     document.body.appendChild(a);
     a.click();
     a.remove();
