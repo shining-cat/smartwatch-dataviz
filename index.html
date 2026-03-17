@@ -2327,6 +2327,7 @@
 
     const pairs = defineMetricPairs();
     const correlations = [];
+    const allCalculations = []; // Track ALL calculations for transparency
 
     for (const pair of pairs) {
       const indData = metricsData[pair.independent];
@@ -2334,6 +2335,7 @@
 
       if (!indData || !depData || indData.values.length === 0 || depData.values.length === 0) {
         console.log(`Skipping ${pair.label}: missing data`);
+        allCalculations.push({ pair, status: 'missing_data', r: null, sampleSize: 0 });
         continue;
       }
 
@@ -2342,6 +2344,7 @@
 
       if (aligned.x.length < 14) {
         console.log(`Skipping ${pair.label}: only ${aligned.x.length} overlapping days`);
+        allCalculations.push({ pair, status: 'insufficient_data', r: null, sampleSize: aligned.x.length });
         continue;
       }
 
@@ -2350,6 +2353,7 @@
 
       if (r === null) {
         console.log(`Skipping ${pair.label}: correlation calculation failed`);
+        allCalculations.push({ pair, status: 'calculation_failed', r: null, sampleSize: aligned.x.length });
         continue;
       }
 
@@ -2357,8 +2361,11 @@
 
       if (strength === "none") {
         console.log(`Skipping ${pair.label}: correlation too weak (r=${r.toFixed(3)})`);
+        allCalculations.push({ pair, status: 'too_weak', r, sampleSize: aligned.x.length });
         continue;
       }
+
+      allCalculations.push({ pair, status: 'success', r, sampleSize: aligned.x.length });
 
       // Calculate bucket statistics
       const buckets = bucketByPercentile(aligned.x);
@@ -2422,6 +2429,10 @@
     correlations.sort((a, b) => Math.abs(b.r) - Math.abs(a.r));
 
     console.log(`Calculated ${correlations.length} correlations`);
+
+    // Store all calculations globally for transparency display
+    window.allCorrelationCalculations = allCalculations;
+
     return correlations;
   }
 
@@ -2932,6 +2943,76 @@
             • Consistent sleep schedules help maintain energy levels<br/>
             • Physical activity during the day helps regulate circadian rhythm<br/>
             • Getting enough sleep supports better workout performance
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  /**
+   * Render analysis results showing what was actually calculated
+   * @returns {string} HTML string
+   */
+  function renderAnalysisResults() {
+    const calculations = window.allCorrelationCalculations || [];
+
+    if (calculations.length === 0) {
+      return renderEducationalFallback(14); // Fallback to old message if no data at all
+    }
+
+    const tooWeak = calculations.filter(c => c.status === 'too_weak');
+    const insufficientData = calculations.filter(c => c.status === 'insufficient_data');
+    const missingData = calculations.filter(c => c.status === 'missing_data');
+    const successful = calculations.filter(c => c.status === 'success');
+
+    return `
+      <div style="text-align: center; padding: 40px 20px; background: rgba(255, 193, 7, 0.05); border-radius: 12px; border: 1px solid rgba(255, 193, 7, 0.2);">
+        <div style="font-size: 48px; margin-bottom: 16px;">🔍</div>
+        <div style="font-size: 18px; font-weight: 700; color: var(--fg); margin-bottom: 12px;">
+          Analysis Complete: No Strong Patterns Found
+        </div>
+        <div class="muted" style="max-width: 600px; margin: 0 auto 20px; line-height: 1.6;">
+          I analyzed ${calculations.length} potential correlations between your sleep and activity metrics.
+          ${successful.length > 0 ? `Found ${successful.length} patterns above the minimum threshold.` : 'None exceeded the minimum strength threshold (r ≥ 0.15).'}
+        </div>
+
+        <div style="background: rgba(255,255,255,0.02); border-radius: 12px; padding: 20px; max-width: 700px; margin: 0 auto; text-align: left;">
+          <div style="font-size: 14px; font-weight: 600; color: var(--fg); margin-bottom: 12px;">
+            📊 What I analyzed:
+          </div>
+          <div style="font-size: 13px; line-height: 1.8; color: var(--muted);">
+            ${tooWeak.length > 0 ? `
+              <div style="margin-bottom: 12px;">
+                <strong style="color: var(--fg);">${tooWeak.length} weak correlations</strong> (r < 0.15, not meaningful):
+                <div style="margin-left: 16px; margin-top: 4px;">
+                  ${tooWeak.map(c => `• ${c.pair.label}: <span style="font-family: monospace;">r = ${c.r.toFixed(3)}</span> (${c.sampleSize} days)`).join('<br/>')}
+                </div>
+              </div>
+            ` : ''}
+            ${insufficientData.length > 0 ? `
+              <div style="margin-bottom: 12px;">
+                <strong style="color: var(--fg);">${insufficientData.length} skipped</strong> (not enough overlapping data):
+                <div style="margin-left: 16px; margin-top: 4px;">
+                  ${insufficientData.map(c => `• ${c.pair.label}: only ${c.sampleSize} days (need 14+)`).join('<br/>')}
+                </div>
+              </div>
+            ` : ''}
+            ${missingData.length > 0 ? `
+              <div style="margin-bottom: 12px;">
+                <strong style="color: var(--fg);">${missingData.length} skipped</strong> (missing metric data):
+                <div style="margin-left: 16px; margin-top: 4px;">
+                  ${missingData.map(c => `• ${c.pair.label}`).join('<br/>')}
+                </div>
+              </div>
+            ` : ''}
+          </div>
+
+          <div style="margin-top: 20px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.05);">
+            <div style="font-size: 12px; color: var(--muted); line-height: 1.6;">
+              <strong style="color: var(--fg);">What this means:</strong> Your sleep and activity don't show strong linear relationships.
+              This is actually quite common! Sleep is influenced by many factors (stress, caffeine, room temperature, etc.),
+              so activity might only be a small piece of your personal puzzle.
+            </div>
           </div>
         </div>
       </div>
@@ -4945,7 +5026,7 @@
       // Check if we have any correlations
       if (correlations.length === 0) {
         if (topContainer) {
-          topContainer.innerHTML = renderEducationalFallback(14);
+          topContainer.innerHTML = renderAnalysisResults();
         }
         if (sleepContainer) sleepContainer.innerHTML = '';
         if (activityContainer) activityContainer.innerHTML = '';
@@ -4960,7 +5041,7 @@
         const topHtml = organized.topDiscoveries.map(c => renderPatternCard(c, true)).join('');
         if (topContainer) topContainer.innerHTML = topHtml;
       } else {
-        if (topContainer) topContainer.innerHTML = renderEducationalFallback(14);
+        if (topContainer) topContainer.innerHTML = renderAnalysisResults();
       }
 
       // Render sleep insights
