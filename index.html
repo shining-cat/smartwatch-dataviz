@@ -2646,38 +2646,108 @@
       return;
     }
 
-    // Dispose existing chart if any
-    const existingChart = echarts.getInstanceByDom(container);
-    if (existingChart) {
-      existingChart.dispose();
+    // CRITICAL FIX #2: Check for empty scatterData array
+    if (!correlation.scatterData || correlation.scatterData.length === 0) {
+      console.warn('No scatter data available for correlation');
+      container.innerHTML = '<div style="padding:20px;color:var(--muted);text-align:center;">Insufficient data for scatter plot</div>';
+      return;
+    }
+
+    // IMPORTANT FIX #5: Filter out NaN and invalid values
+    const validData = correlation.scatterData.filter(d =>
+      typeof d.x === 'number' && !isNaN(d.x) &&
+      typeof d.y === 'number' && !isNaN(d.y)
+    );
+
+    if (validData.length < 2) {
+      console.warn('Insufficient valid data points for scatter plot');
+      container.innerHTML = '<div style="padding:20px;color:var(--muted);text-align:center;">Insufficient valid data points</div>';
+      return;
+    }
+
+    // CRITICAL FIX #3: Use global chart registry to prevent memory leaks
+    if (!window.scatterCharts) window.scatterCharts = {};
+
+    const chartKey = containerId;
+    if (window.scatterCharts[chartKey]) {
+      try { window.scatterCharts[chartKey].dispose(); } catch(e) {}
     }
 
     // Initialize chart
     const chart = echarts.init(container, null, { renderer: 'canvas' });
+    window.scatterCharts[chartKey] = chart;
 
-    // Prepare data by bucket
-    const lowData = correlation.scatterData.filter(d => d.bucket === 'low').map(d => [d.x, d.y]);
-    const mediumData = correlation.scatterData.filter(d => d.bucket === 'medium').map(d => [d.x, d.y]);
-    const highData = correlation.scatterData.filter(d => d.bucket === 'high').map(d => [d.x, d.y]);
+    // Prepare data by bucket using validData
+    const lowData = validData.filter(d => d.bucket === 'low').map(d => [d.x, d.y]);
+    const mediumData = validData.filter(d => d.bucket === 'medium').map(d => [d.x, d.y]);
+    const highData = validData.filter(d => d.bucket === 'high').map(d => [d.x, d.y]);
 
-    // Calculate trend line (linear regression)
-    const allX = correlation.scatterData.map(d => d.x);
-    const allY = correlation.scatterData.map(d => d.y);
+    // Calculate trend line (linear regression) using validData
+    const allX = validData.map(d => d.x);
+    const allY = validData.map(d => d.y);
     const n = allX.length;
     const sumX = allX.reduce((a, b) => a + b, 0);
     const sumY = allY.reduce((a, b) => a + b, 0);
     const sumXY = allX.reduce((sum, x, i) => sum + x * allY[i], 0);
     const sumX2 = allX.reduce((sum, x) => sum + x * x, 0);
 
-    const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
-    const intercept = (sumY - slope * sumX) / n;
+    // CRITICAL FIX #1: Check for division by zero in trend line calculation
+    const denominator = n * sumX2 - sumX * sumX;
+    let trendSeries = null;
 
-    const minX = Math.min(...allX);
-    const maxX = Math.max(...allX);
-    const trendLine = [
-      [minX, slope * minX + intercept],
-      [maxX, slope * maxX + intercept]
+    if (denominator === 0) {
+      console.warn('Cannot calculate trend line: all X values are identical');
+      // Don't include trend line if all X values are the same
+    } else {
+      const slope = (n * sumXY - sumX * sumY) / denominator;
+      const intercept = (sumY - slope * sumX) / n;
+
+      const minX = Math.min(...allX);
+      const maxX = Math.max(...allX);
+      const trendLine = [
+        [minX, slope * minX + intercept],
+        [maxX, slope * maxX + intercept]
+      ];
+
+      trendSeries = {
+        name: 'Trend',
+        type: 'line',
+        data: trendLine,
+        lineStyle: { color: '#ffbf3a', width: 2, type: 'dashed' },
+        symbol: 'none',
+        silent: true
+      };
+    }
+
+    // Build series array conditionally
+    const series = [
+      {
+        name: 'Low',
+        type: 'scatter',
+        data: lowData,
+        symbolSize: 8,
+        itemStyle: { color: '#3a5a7f' }
+      },
+      {
+        name: 'Medium',
+        type: 'scatter',
+        data: mediumData,
+        symbolSize: 8,
+        itemStyle: { color: '#5a8abf' }
+      },
+      {
+        name: 'High',
+        type: 'scatter',
+        data: highData,
+        symbolSize: 8,
+        itemStyle: { color: '#3aa0ff' }
+      }
     ];
+
+    // Add trend line only if it was calculated successfully
+    if (trendSeries) {
+      series.push(trendSeries);
+    }
 
     // Chart configuration
     chart.setOption({
@@ -2689,7 +2759,7 @@
         textStyle: { color: '#e7eef7' },
         formatter: (params) => {
           if (params.seriesName === 'Trend') return '';
-          const point = correlation.scatterData.find(d => d.x === params.value[0] && d.y === params.value[1]);
+          const point = validData.find(d => d.x === params.value[0] && d.y === params.value[1]);
           const xLabel = getMetricLabel(correlation.independent);
           const yLabel = getMetricLabel(correlation.dependent);
           const xVal = formatMetricValue(correlation.independent, params.value[0]);
@@ -2733,43 +2803,11 @@
         axisLine: { lineStyle: { color: '#2a3a55' } },
         splitLine: { lineStyle: { color: '#1f2a3a' } }
       },
-      series: [
-        {
-          name: 'Low',
-          type: 'scatter',
-          data: lowData,
-          symbolSize: 8,
-          itemStyle: { color: '#3a5a7f' }
-        },
-        {
-          name: 'Medium',
-          type: 'scatter',
-          data: mediumData,
-          symbolSize: 8,
-          itemStyle: { color: '#5a8abf' }
-        },
-        {
-          name: 'High',
-          type: 'scatter',
-          data: highData,
-          symbolSize: 8,
-          itemStyle: { color: '#3aa0ff' }
-        },
-        {
-          name: 'Trend',
-          type: 'line',
-          data: trendLine,
-          lineStyle: { color: '#ffbf3a', width: 2, type: 'dashed' },
-          symbol: 'none',
-          silent: true
-        }
-      ]
+      series: series
     });
 
-    // Handle resize
-    window.addEventListener('resize', () => {
-      try { chart.resize(); } catch (e) {}
-    });
+    // CRITICAL FIX #3: Resize handlers managed globally (no per-chart listener)
+    // Global resize handler will be set up once below
   }
 
   /**
@@ -2794,12 +2832,16 @@
           scatterContainer.style.display = 'block';
           e.target.textContent = 'Hide scatter plot ▲';
 
-          // Find correlation data
+          // IMPORTANT FIX #4: Add feedback when correlation data not found
           if (window.cachedCorrelations) {
             const correlation = window.cachedCorrelations.find(c => c.id === correlationId);
             if (correlation) {
               renderCorrelationScatter(correlation, `scatter-${correlationId}`);
+            } else {
+              scatterContainer.innerHTML = '<div style="padding:20px;color:var(--muted);">Correlation data not available</div>';
             }
+          } else {
+            scatterContainer.innerHTML = '<div style="padding:20px;color:var(--muted);">Correlation data not available</div>';
           }
         }
       }
@@ -2808,6 +2850,15 @@
 
   // Call setup on page load
   setupScatterPlotToggles();
+
+  // CRITICAL FIX #3: Global resize handler for all scatter charts (prevents memory leak)
+  window.addEventListener('resize', () => {
+    if (window.scatterCharts) {
+      Object.values(window.scatterCharts).forEach(chart => {
+        try { chart.resize(); } catch(e) {}
+      });
+    }
+  });
 
   async function computeSleepInsights(){
     const dur = await fetchDailySeries("sleep_duration_min");
