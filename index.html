@@ -2634,6 +2634,181 @@
   `;
   }
 
+  /**
+   * Render scatter plot for a correlation
+   * @param {Object} correlation - Correlation object
+   * @param {string} containerId - DOM element ID for chart
+   */
+  function renderCorrelationScatter(correlation, containerId) {
+    const container = document.getElementById(containerId);
+    if (!container) {
+      console.error(`Container ${containerId} not found`);
+      return;
+    }
+
+    // Dispose existing chart if any
+    const existingChart = echarts.getInstanceByDom(container);
+    if (existingChart) {
+      existingChart.dispose();
+    }
+
+    // Initialize chart
+    const chart = echarts.init(container, null, { renderer: 'canvas' });
+
+    // Prepare data by bucket
+    const lowData = correlation.scatterData.filter(d => d.bucket === 'low').map(d => [d.x, d.y]);
+    const mediumData = correlation.scatterData.filter(d => d.bucket === 'medium').map(d => [d.x, d.y]);
+    const highData = correlation.scatterData.filter(d => d.bucket === 'high').map(d => [d.x, d.y]);
+
+    // Calculate trend line (linear regression)
+    const allX = correlation.scatterData.map(d => d.x);
+    const allY = correlation.scatterData.map(d => d.y);
+    const n = allX.length;
+    const sumX = allX.reduce((a, b) => a + b, 0);
+    const sumY = allY.reduce((a, b) => a + b, 0);
+    const sumXY = allX.reduce((sum, x, i) => sum + x * allY[i], 0);
+    const sumX2 = allX.reduce((sum, x) => sum + x * x, 0);
+
+    const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+    const intercept = (sumY - slope * sumX) / n;
+
+    const minX = Math.min(...allX);
+    const maxX = Math.max(...allX);
+    const trendLine = [
+      [minX, slope * minX + intercept],
+      [maxX, slope * maxX + intercept]
+    ];
+
+    // Chart configuration
+    chart.setOption({
+      backgroundColor: 'transparent',
+      tooltip: {
+        trigger: 'item',
+        backgroundColor: '#121824',
+        borderColor: '#2a3a55',
+        textStyle: { color: '#e7eef7' },
+        formatter: (params) => {
+          if (params.seriesName === 'Trend') return '';
+          const point = correlation.scatterData.find(d => d.x === params.value[0] && d.y === params.value[1]);
+          const xLabel = getMetricLabel(correlation.independent);
+          const yLabel = getMetricLabel(correlation.dependent);
+          const xVal = formatMetricValue(correlation.independent, params.value[0]);
+          const yVal = formatMetricValue(correlation.dependent, params.value[1]);
+          return `${point?.date || ''}<br/>${xLabel}: ${xVal}<br/>${yLabel}: ${yVal}<br/>Bucket: ${point?.bucket || ''}`;
+        }
+      },
+      grid: {
+        left: '12%',
+        right: '4%',
+        bottom: '12%',
+        top: '8%',
+        containLabel: true
+      },
+      xAxis: {
+        type: 'value',
+        name: getMetricLabel(correlation.independent),
+        nameLocation: 'middle',
+        nameGap: 30,
+        nameTextStyle: { color: '#9fb0c3', fontSize: 12 },
+        axisLabel: { color: '#9fb0c3', fontSize: 11 },
+        axisLine: { lineStyle: { color: '#2a3a55' } },
+        splitLine: { lineStyle: { color: '#1f2a3a' } }
+      },
+      yAxis: {
+        type: 'value',
+        name: getMetricLabel(correlation.dependent),
+        nameLocation: 'middle',
+        nameGap: 50,
+        nameTextStyle: { color: '#9fb0c3', fontSize: 12 },
+        axisLabel: {
+          color: '#9fb0c3',
+          fontSize: 11,
+          formatter: (val) => {
+            if (correlation.dependent === 'sleep_duration_min') {
+              return `${Math.round(val / 60)}h`;
+            }
+            return Math.round(val);
+          }
+        },
+        axisLine: { lineStyle: { color: '#2a3a55' } },
+        splitLine: { lineStyle: { color: '#1f2a3a' } }
+      },
+      series: [
+        {
+          name: 'Low',
+          type: 'scatter',
+          data: lowData,
+          symbolSize: 8,
+          itemStyle: { color: '#3a5a7f' }
+        },
+        {
+          name: 'Medium',
+          type: 'scatter',
+          data: mediumData,
+          symbolSize: 8,
+          itemStyle: { color: '#5a8abf' }
+        },
+        {
+          name: 'High',
+          type: 'scatter',
+          data: highData,
+          symbolSize: 8,
+          itemStyle: { color: '#3aa0ff' }
+        },
+        {
+          name: 'Trend',
+          type: 'line',
+          data: trendLine,
+          lineStyle: { color: '#ffbf3a', width: 2, type: 'dashed' },
+          symbol: 'none',
+          silent: true
+        }
+      ]
+    });
+
+    // Handle resize
+    window.addEventListener('resize', () => {
+      try { chart.resize(); } catch (e) {}
+    });
+  }
+
+  /**
+   * Setup scatter plot toggle handlers
+   */
+  function setupScatterPlotToggles() {
+    document.addEventListener('click', (e) => {
+      if (e.target.classList.contains('btn-show-scatter')) {
+        const correlationId = e.target.getAttribute('data-correlation-id');
+        const scatterContainer = document.getElementById(`scatter-${correlationId}`);
+
+        if (!scatterContainer) return;
+
+        const isVisible = scatterContainer.style.display !== 'none';
+
+        if (isVisible) {
+          // Collapse
+          scatterContainer.style.display = 'none';
+          e.target.textContent = 'Show scatter plot ▼';
+        } else {
+          // Expand and render
+          scatterContainer.style.display = 'block';
+          e.target.textContent = 'Hide scatter plot ▲';
+
+          // Find correlation data
+          if (window.cachedCorrelations) {
+            const correlation = window.cachedCorrelations.find(c => c.id === correlationId);
+            if (correlation) {
+              renderCorrelationScatter(correlation, `scatter-${correlationId}`);
+            }
+          }
+        }
+      }
+    });
+  }
+
+  // Call setup on page load
+  setupScatterPlotToggles();
+
   async function computeSleepInsights(){
     const dur = await fetchDailySeries("sleep_duration_min");
     const bd = await fetchDailySeries("sleep_bedtime_min");
