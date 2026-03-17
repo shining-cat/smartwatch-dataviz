@@ -1,112 +1,128 @@
-# Smartwatch Data Visualization Tool
+# Smartwatch Data Visualization
 
-Privacy-first health data visualization tool that runs entirely in your browser.
+**Understand your health data without compromising your privacy.**
 
-## Features
+A browser-based tool that analyzes your smartwatch health export (sleep, activity, workouts) to uncover patterns and insights. All processing happens locally on your machine - your health data never leaves your computer.
 
-### 📊 Activity Dashboard
-- **Daily Steps:** Time series visualization with weekly patterns and trend indicators
-- **Workout Overview:**
-  - Activity type distribution (running, cycling, swimming, etc.)
-  - Workout frequency and duration trends
-  - Calendar heatmap showing workout intensity over time
-- **Weekly Patterns:** Weekday vs weekend activity comparisons
-- **Distance & Elevation:** Total metrics with visual breakdowns
+## What You Get
 
-### 😴 Sleep Analysis
-- **Duration Tracking:** Sleep duration trends, averages, and healthy range indicators
-- **Timing Patterns:** Bedtime and wake time consistency with chronotype detection
-- **Weekly Insights:** Weekday effects and recurring pattern analysis
-- **Nap Filtering:** Toggle to include/exclude naps from analysis
-- **Visual Indicators:** Color-coded duration charts and comparison bars
+**📊 Activity Insights**
+- Step count trends and weekly patterns
+- Workout analysis by type (running, cycling, swimming, etc.)
+- Calendar heatmap showing your most active periods
+- Distance and elevation tracking
 
-### 💡 Correlation Discovery (Insights)
-- **Pattern Detection:** Analyzes 9 metric pairs to find relationships between sleep and activity
-- **Smart Organization:**
-  - Top 3 strongest discoveries highlighted
-  - Sleep-focused insights (70% weight)
-  - Activity insights (30% weight)
-- **Statistical Rigor:**
-  - Pearson correlation with confidence indicators
-  - Percentile-based comparisons (Low/Medium/High)
-  - Minimum 14 days of overlapping data required
-- **Interactive Visualizations:** Expandable scatter plots with trend lines
-- **Transparent Results:** Shows all calculations even when patterns are weak
-- **Educational Context:** "Correlation ≠ Causation" disclaimer and research insights
+**😴 Sleep Analysis**
+- Duration trends with healthy range indicators
+- Bedtime and wake time consistency tracking
+- Chronotype detection (are you an early bird or night owl?)
+- Weekly pattern comparison (weekdays vs weekends)
+- Nap filtering option
 
-### 📈 Timeline Dashboard
-- Multi-metric time series with rolling averages and normalization
+**💡 Pattern Discovery**
+- Automatically finds correlations between your sleep and activity
+- "Does more exercise help me sleep better?" - answered with your own data
+- Statistical analysis with easy-to-understand visualizations
+- Shows what was analyzed even when no patterns are found
 
-## Recent Enhancements
+**📈 Timeline View**
+- Multi-metric time series with rolling averages
+- Compare different health metrics over time
 
-**March 2026:**
-- ✨ **New: Correlation Discovery Engine** - Automatically finds patterns between sleep and activity
-- ✨ **New: Activity Dashboard** - Comprehensive workout and step tracking with weekly patterns
-- 🔧 **Enhanced: Sleep Analysis** - Added nap filtering, improved chronotype detection, visual indicators
-- 📊 **Improved: Data Visualization** - Interactive scatter plots, calendar heatmaps, trend indicators
-- 🎨 **UX: Transparent Results** - Shows analysis details even when correlations are weak
+## Privacy First
+
+🔒 **Your health data stays on your computer. Period.**
+
+- **No uploads:** Data never leaves your machine
+- **No tracking:** No analytics, no external requests
+- **100% local processing:** Everything runs in your browser
+- **Open source:** Single HTML file - you can inspect exactly what it does
+
+The only external requests are for JavaScript libraries (ECharts, etc.) loaded from CDN. Your health data is never transmitted anywhere.
 
 ## How to Use
 
-1. **Place your health data export** in `data/raw/` directory
-   - The ZIP file from your smartwatch health export
-   - This folder is gitignored - data never leaves your machine
+### 1. Get Your Health Data Export
 
-2. **Open the app**
-   - Double-click `index.html` to open in browser
-   - No server needed, no installation required
+Export your health data from your smartwatch as a ZIP file. Place it anywhere on your computer (or use the `data/raw/` folder in this project).
 
-3. **Load your data**
-   - Drag and drop your ZIP file into the browser window
-   - Or click "Choose ZIP" to select the file
+### 2. Run a Local Web Server
 
-4. **Explore your health data**
-   - Switch between Activity, Sleep, Insights, and Timeline tabs
-   - Toggle nap filtering in Sleep tab
-   - Discover correlations between your metrics in Insights tab
-   - All processing happens locally in your browser
+**Why?** Modern browsers block local file access for security. You need a simple web server.
 
-## Privacy & Data Safety
+**Easiest option - Python (built into macOS/Linux):**
+```bash
+# Navigate to this project folder
+cd /path/to/smartwatch-dataviz
 
-- **100% client-side:** All data processing happens in your browser
-- **No uploads:** Your health data never leaves your machine
-- **No tracking:** No analytics, no external requests (except CDN libraries)
-- **Git-safe:** The `data/` folder is gitignored - health data never committed
+# Start a web server
+python3 -m http.server 8000
 
-## Portability
+# Or if you have Python 2:
+python -m SimpleHTTPServer 8000
+```
 
-Works on macOS, Windows, and Linux - just needs a modern browser (Chrome, Firefox, Safari, Edge).
+**Other options:**
+- **Node.js:** `npx http-server`
+- **VS Code:** Install "Live Server" extension and click "Go Live"
+- **Any other local web server** works fine
 
-## Development
+### 3. Open the App
 
-See `docs/plans/` for design documents and implementation plans.
+Open your browser and go to:
+```
+http://localhost:8000
+```
 
-### Git Setup
+### 4. Load Your Data
 
-This project uses PERSO git configuration:
-- Email: shiva.bernhard@shining-cat.fr
-- All health data in `data/` is gitignored
+1. Click **"Choose ZIP"** or drag-and-drop your health export ZIP file
+2. Wait for processing (first load takes a moment to parse and store data)
+3. Explore your dashboards:
+   - **Activity** - Steps, workouts, calendar heatmap
+   - **Sleep** - Duration, timing, patterns (toggle nap filtering)
+   - **Insights** - Discover correlations between metrics
+   - **Timeline** - Multi-metric time series
 
-### Project Structure
+**Note:** Your data is stored in browser IndexedDB. It persists between sessions but stays local to your machine.
+
+## Technical Details
+
+**Single-file architecture:** Everything is in `index.html` - no build process, no dependencies to install.
+
+**Tech stack:**
+- HTML5 + JavaScript (ES6+)
+- ECharts (interactive charts)
+- PapaParse (CSV parsing)
+- JSZip (ZIP extraction)
+- Dexie (IndexedDB wrapper)
+
+**Browser requirements:** Modern browser (Chrome, Firefox, Safari, Edge) with JavaScript enabled.
+
+## Project Structure
 
 ```
 smartwatch-dataviz/
-├── index.html          # Single-file app
-├── data/               # .gitignored - your health data
+├── index.html          # Single-file app (all code here)
+├── data/               # .gitignored - place your health export here
 │   └── raw/
-│       └── health-export.zip
-├── docs/               # Documentation and plans
-│   └── plans/
+├── docs/               # Design documents and implementation plans
 └── README.md
 ```
 
-## Tech Stack
+## Troubleshooting
 
-- HTML5, JavaScript (ES6+)
-- ECharts (visualization)
-- PapaParse (CSV parsing)
-- JSZip (ZIP extraction)
-- Dexie (IndexedDB storage)
+**"Failed to load data"**
+- Make sure you're running through a web server (not opening `index.html` directly)
+- Check browser console for errors
+
+**"No patterns found" in Insights tab**
+- You need at least 14 days of overlapping sleep and activity data
+- If you have enough data but correlations are weak, the tool will show what was analyzed
+
+**Data not persisting**
+- Browser IndexedDB might be cleared if you clear browser data
+- Keep your original ZIP export as backup
 
 ## License
 
