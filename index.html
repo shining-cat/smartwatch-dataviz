@@ -2171,6 +2171,131 @@
   }
 
   /**
+   * Calculate mean of an array
+   * @param {Array<number>} values
+   * @returns {number|null}
+   */
+  function calculateMean(values) {
+    if (!values || values.length === 0) return null;
+    const validValues = values.filter(v => v !== null && !isNaN(v));
+    if (validValues.length === 0) return null;
+    return validValues.reduce((sum, v) => sum + v, 0) / validValues.length;
+  }
+
+  /**
+   * Calculate standard deviation
+   * @param {Array<number>} values
+   * @returns {number|null}
+   */
+  function calculateStdDev(values) {
+    if (!values || values.length < 2) return null;
+    const validValues = values.filter(v => v !== null && !isNaN(v));
+    if (validValues.length < 2) return null;
+
+    const mean = calculateMean(validValues);
+    if (mean === null) return null;
+
+    const squaredDiffs = validValues.map(v => Math.pow(v - mean, 2));
+    const variance = squaredDiffs.reduce((sum, v) => sum + v, 0) / (validValues.length - 1);
+    return Math.sqrt(variance);
+  }
+
+  /**
+   * Two-sample t-test (Welch's t-test for unequal variances)
+   * @param {Array<number>} group1
+   * @param {Array<number>} group2
+   * @returns {Object|null} {t, df, p, mean1, mean2, diff, n1, n2}
+   */
+  function tTest(group1, group2) {
+    const valid1 = group1.filter(v => v !== null && !isNaN(v));
+    const valid2 = group2.filter(v => v !== null && !isNaN(v));
+
+    if (valid1.length < 10 || valid2.length < 10) return null; // Minimum sample size
+
+    const mean1 = calculateMean(valid1);
+    const mean2 = calculateMean(valid2);
+    const std1 = calculateStdDev(valid1);
+    const std2 = calculateStdDev(valid2);
+
+    if (mean1 === null || mean2 === null || std1 === null || std2 === null) return null;
+    if (std1 === 0 && std2 === 0) return null; // No variance
+
+    const n1 = valid1.length;
+    const n2 = valid2.length;
+
+    // Welch's t-statistic
+    const var1 = Math.pow(std1, 2);
+    const var2 = Math.pow(std2, 2);
+    const t = (mean1 - mean2) / Math.sqrt(var1 / n1 + var2 / n2);
+
+    // Welch-Satterthwaite degrees of freedom
+    const df = Math.pow(var1 / n1 + var2 / n2, 2) /
+               (Math.pow(var1 / n1, 2) / (n1 - 1) + Math.pow(var2 / n2, 2) / (n2 - 1));
+
+    // Approximate p-value using t-distribution (two-tailed)
+    // For simplicity, use critical values: |t| > 2.0 ≈ p < 0.05, |t| > 2.6 ≈ p < 0.01
+    let p;
+    const absT = Math.abs(t);
+    if (absT > 2.6) p = 0.01;
+    else if (absT > 2.0) p = 0.05;
+    else p = 0.10; // Not significant
+
+    return {
+      t,
+      df,
+      p,
+      mean1,
+      mean2,
+      diff: mean1 - mean2,
+      n1,
+      n2
+    };
+  }
+
+  /**
+   * Cohen's d effect size
+   * @param {Array<number>} group1
+   * @param {Array<number>} group2
+   * @returns {number|null}
+   */
+  function cohensD(group1, group2) {
+    const valid1 = group1.filter(v => v !== null && !isNaN(v));
+    const valid2 = group2.filter(v => v !== null && !isNaN(v));
+
+    if (valid1.length < 2 || valid2.length < 2) return null;
+
+    const mean1 = calculateMean(valid1);
+    const mean2 = calculateMean(valid2);
+    const std1 = calculateStdDev(valid1);
+    const std2 = calculateStdDev(valid2);
+
+    if (mean1 === null || mean2 === null || std1 === null || std2 === null) return null;
+
+    const n1 = valid1.length;
+    const n2 = valid2.length;
+
+    // Pooled standard deviation
+    const pooledStd = Math.sqrt(((n1 - 1) * Math.pow(std1, 2) + (n2 - 1) * Math.pow(std2, 2)) / (n1 + n2 - 2));
+
+    if (pooledStd === 0) return null;
+
+    return (mean1 - mean2) / pooledStd;
+  }
+
+  /**
+   * Classify effect size magnitude
+   * @param {number} d - Cohen's d
+   * @returns {string} "small" | "medium" | "large" | "negligible"
+   */
+  function classifyEffectSize(d) {
+    const absD = Math.abs(d);
+    if (absD >= 0.8) return "large";
+    if (absD >= 0.5) return "medium";
+    if (absD >= 0.2) return "small";
+    return "negligible";
+  }
+
+  /**
    * Classify confidence level based on sample size
    * @param {number} sampleSize - Number of data points
    * @returns {string} "strong" | "moderate" | "early"
