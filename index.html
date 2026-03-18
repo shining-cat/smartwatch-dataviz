@@ -2171,13 +2171,23 @@
   }
 
   /**
+   * Filter array to include only valid numbers (non-null, non-NaN)
+   * @param {Array} values - Array to filter
+   * @returns {Array<number>} Array of valid numbers
+   */
+  function filterValidNumbers(values) {
+    if (!values || !Array.isArray(values)) return [];
+    return values.filter(v => v !== null && !isNaN(v) && typeof v === 'number');
+  }
+
+  /**
    * Calculate mean of an array
    * @param {Array<number>} values
    * @returns {number|null}
    */
   function calculateMean(values) {
     if (!values || values.length === 0) return null;
-    const validValues = values.filter(v => v !== null && !isNaN(v));
+    const validValues = filterValidNumbers(values);
     if (validValues.length === 0) return null;
     return validValues.reduce((sum, v) => sum + v, 0) / validValues.length;
   }
@@ -2189,7 +2199,7 @@
    */
   function calculateStdDev(values) {
     if (!values || values.length < 2) return null;
-    const validValues = values.filter(v => v !== null && !isNaN(v));
+    const validValues = filterValidNumbers(values);
     if (validValues.length < 2) return null;
 
     const mean = calculateMean(validValues);
@@ -2207,10 +2217,12 @@
    * @returns {Object|null} {t, df, p, mean1, mean2, diff, n1, n2}
    */
   function tTest(group1, group2) {
-    const valid1 = group1.filter(v => v !== null && !isNaN(v));
-    const valid2 = group2.filter(v => v !== null && !isNaN(v));
+    const valid1 = filterValidNumbers(group1);
+    const valid2 = filterValidNumbers(group2);
 
-    if (valid1.length < 10 || valid2.length < 10) return null; // Minimum sample size
+    // Minimum sample size of 10 per group for reliable t-test results
+    // (conservative threshold to ensure central limit theorem holds)
+    if (valid1.length < 10 || valid2.length < 10) return null;
 
     const mean1 = calculateMean(valid1);
     const mean2 = calculateMean(valid2);
@@ -2232,8 +2244,9 @@
     const df = Math.pow(var1 / n1 + var2 / n2, 2) /
                (Math.pow(var1 / n1, 2) / (n1 - 1) + Math.pow(var2 / n2, 2) / (n2 - 1));
 
-    // Approximate p-value using t-distribution (two-tailed)
-    // For simplicity, use critical values: |t| > 2.0 ≈ p < 0.05, |t| > 2.6 ≈ p < 0.01
+    // Approximate p-value using t-distribution critical values
+    // Note: This is a rough approximation ignoring df. For precise p-values,
+    // a full t-distribution CDF would be needed. Sufficient for exploratory analysis.
     let p;
     const absT = Math.abs(t);
     if (absT > 2.6) p = 0.01;
@@ -2259,8 +2272,8 @@
    * @returns {number|null}
    */
   function cohensD(group1, group2) {
-    const valid1 = group1.filter(v => v !== null && !isNaN(v));
-    const valid2 = group2.filter(v => v !== null && !isNaN(v));
+    const valid1 = filterValidNumbers(group1);
+    const valid2 = filterValidNumbers(group2);
 
     if (valid1.length < 2 || valid2.length < 2) return null;
 
@@ -2285,9 +2298,10 @@
   /**
    * Classify effect size magnitude
    * @param {number} d - Cohen's d
-   * @returns {string} "small" | "medium" | "large" | "negligible"
+   * @returns {string|null} "small" | "medium" | "large" | "negligible" | null
    */
   function classifyEffectSize(d) {
+    if (d == null || isNaN(d)) return null; // Handle invalid input
     const absD = Math.abs(d);
     if (absD >= 0.8) return "large";
     if (absD >= 0.5) return "medium";
