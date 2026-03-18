@@ -890,15 +890,26 @@
                 const minHR = r["Heart rate (min)"] || r["heart rate (min)"] || r.hr_min;
                 const maxHR = r["Heart rate (max)"] || r["heart rate (max)"] || r.hr_max;
 
-                // Parse and validate HR values (valid range: 20-200 bpm)
-                const avgHeartRate = avgHR ? parseFloat(avgHR) : null;
-                const minHeartRate = minHR ? parseFloat(minHR) : null;
-                const maxHeartRate = maxHR ? parseFloat(maxHR) : null;
+                // Parse and validate HR values
+                const avgHeartRate = toNumber(avgHR);
+                const minHeartRate = toNumber(minHR);
+                const maxHeartRate = toNumber(maxHR);
 
                 // Sanitize (set to null if invalid, but keep the sleep record)
-                const validAvgHR = (avgHeartRate !== null && !isNaN(avgHeartRate) && avgHeartRate >= 20 && avgHeartRate <= 200) ? avgHeartRate : null;
-                const validMinHR = (minHeartRate !== null && !isNaN(minHeartRate) && minHeartRate >= 20 && minHeartRate <= 200) ? minHeartRate : null;
-                const validMaxHR = (maxHeartRate !== null && !isNaN(maxHeartRate) && maxHeartRate >= 20 && maxHeartRate <= 200) ? maxHeartRate : null;
+                const validAvgHR = (avgHeartRate !== null && avgHeartRate >= HR_MIN_BPM && avgHeartRate <= HR_MAX_BPM) ? avgHeartRate : null;
+                if (avgHR && validAvgHR === null) {
+                  console.warn(`Sanitizing invalid sleep avg HR: ${avgHR} → null`);
+                }
+
+                const validMinHR = (minHeartRate !== null && minHeartRate >= HR_MIN_BPM && minHeartRate <= HR_MAX_BPM) ? minHeartRate : null;
+                if (minHR && validMinHR === null) {
+                  console.warn(`Sanitizing invalid sleep min HR: ${minHR} → null`);
+                }
+
+                const validMaxHR = (maxHeartRate !== null && maxHeartRate >= HR_MIN_BPM && maxHeartRate <= HR_MAX_BPM) ? maxHeartRate : null;
+                if (maxHR && validMaxHR === null) {
+                  console.warn(`Sanitizing invalid sleep max HR: ${maxHR} → null`);
+                }
 
                 sleepRecordsBuffer.push({
                   date: iso,
