@@ -2277,11 +2277,11 @@
       // ============================================
       // HEART RATE RECOVERY INSIGHTS (HR as target)
       // ============================================
-      { independent: "workout_avg_hr", dependent: "sleep_avg_hr", lag: "same_day", target: "hr", label: "Workout Intensity → Recovery HR" },
+      { independent: "workout_max_hr", dependent: "sleep_avg_hr", lag: "same_day", target: "hr", label: "Peak Workout HR → Recovery HR" },
       { independent: "aggregates_steps", dependent: "sleep_min_hr", lag: "same_day", target: "hr", label: "Steps → Resting HR" },
       { independent: "sleep_duration_min", dependent: "workout_avg_hr", lag: "previous_day", target: "hr", label: "Sleep → Workout Intensity" },
       { independent: "sleep_avg_hr", dependent: "workout_avg_hr", lag: "previous_day", target: "hr", label: "Sleep HR → Next Day Workout Intensity" },
-      { independent: "workout_total_duration", dependent: "sleep_avg_hr", lag: "same_day", target: "hr", label: "Workout Duration → Recovery HR" },
+      { independent: "sleep_min_hr", dependent: "workout_avg_hr", lag: "same_day", target: "hr", label: "Resting HR → Workout Intensity" },
     ];
   }
 
