@@ -928,6 +928,7 @@
                   console.warn(`Sanitizing invalid sleep max HR: ${maxHR} → null`);
                 }
 
+                const isWeekend = dayOfWeek === 0 || dayOfWeek === 6; // Sunday or Saturday
                 sleepRecordsBuffer.push({
                   date: iso,
                   from: fromDt.toISOString(),
@@ -935,6 +936,7 @@
                   durationMinutes,
                   durationHours,
                   dayOfWeek,
+                  isWeekend,
                   weekdayName: weekdayNames[dayOfWeek],
                   avgHeartRate: validAvgHR,
                   minHeartRate: validMinHR,
@@ -2992,8 +2994,14 @@
       "aggregates_steps": "steps",
       "sleep_duration_min": "sleep duration",
       "sleep_bedtime_min": "bedtime",
+      "sleep_wake_min": "wake time",
+      "sleep_avg_hr": "sleep heart rate",
+      "sleep_min_hr": "min sleep HR",
+      "sleep_max_hr": "max sleep HR",
       "workout_count": "workouts",
-      "workout_total_duration": "workout time"
+      "workout_total_duration": "workout time",
+      "workout_avg_hr": "workout heart rate",
+      "workout_max_hr": "max workout HR"
     };
     return labels[metric] || metric;
   }
@@ -3005,15 +3013,20 @@
    * @returns {string} Formatted value with units
    */
   function formatMetricValue(metric, value) {
+    if (value === null || isNaN(value)) return 'N/A';
+
     if (metric === "sleep_duration_min") {
       const hours = Math.floor(value / 60);
       const mins = Math.round(value % 60);
       return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
     }
-    if (metric === "sleep_bedtime_min") {
+    if (metric === "sleep_bedtime_min" || metric === "sleep_wake_min") {
       const hours = Math.floor(value / 60);
       const mins = Math.round(value % 60);
       return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
+    }
+    if (metric.includes("_hr")) {
+      return `${Math.round(value)} bpm`;
     }
     if (metric === "workout_total_duration") {
       return `${Math.round(value)} min`;
@@ -3021,7 +3034,10 @@
     if (metric === "workout_count") {
       return `${value.toFixed(1)} workouts`;
     }
-    return Math.round(value).toLocaleString();
+    if (metric === "aggregates_steps") {
+      return Math.round(value).toLocaleString();
+    }
+    return Math.round(value * 10) / 10;
   }
 
   /**
