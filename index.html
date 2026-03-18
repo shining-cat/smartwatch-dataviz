@@ -3350,33 +3350,81 @@
    * @param {number} topN - Number of top discoveries to show
    * @returns {Object} {topDiscoveries, sleepInsights, activityInsights}
    */
-  function organizeCorrelations(correlations, topN = 3) {
-    if (!correlations || !Array.isArray(correlations)) {
-      console.warn("organizeCorrelations called with invalid input");
-      return {
-        topDiscoveries: [],
-        sleepInsights: { strong: [], weak: [] },
-        activityInsights: { strong: [], weak: [] }
-      };
-    }
+  /**
+   * Organize all insights (correlations, day patterns, segmented) for UI rendering
+   * @param {Array} correlations - Metric correlations
+   * @param {Object} dayPatterns - {weekendVsWeekday: [], dayOfWeek: []}
+   * @param {Array} segmented - Segmented correlations
+   * @returns {Object} Organized insights for rendering
+   */
+  function organizeAllInsights(correlations, dayPatterns, segmented) {
+    console.log("Organizing all insights...");
 
     // Filter out weak correlations with early confidence
     const qualityCorrelations = correlations.filter(c => {
-      if (c.confidence === 'early' && c.strength === 'weak') return false;
+      if (c.strength === 'none' || c.r === null) return false;
+      if (c.strength === 'weak' && c.sampleSize < 30) return false;
       return true;
     });
 
-    // Get top N strongest correlations
-    const topDiscoveries = qualityCorrelations.slice(0, topN);
-    const topIds = new Set(topDiscoveries.map(c => c.id));
+    // Create scoreable items from all three sources
+    const allFindings = [];
 
-    // Separate remaining by target
-    const remaining = qualityCorrelations.filter(c => !topIds.has(c.id));
+    // Add correlations
+    qualityCorrelations.forEach(c => {
+      const score = Math.abs(c.r) * Math.min(c.sampleSize / 100, 1) * (c.strength === 'strong' ? 1.5 : c.strength === 'moderate' ? 1.2 : 1);
+      allFindings.push({
+        type: 'correlation',
+        score,
+        data: c
+      });
+    });
+
+    // Add weekend vs weekday patterns
+    dayPatterns.weekendVsWeekday.forEach(p => {
+      // Score based on effect size and significance
+      const effectScore = Math.abs(p.effectSize);
+      const pScore = p.p <= 0.01 ? 1.5 : 1.0;
+      const score = effectScore * pScore;
+      allFindings.push({
+        type: 'weekendVsWeekday',
+        score,
+        data: p
+      });
+    });
+
+    // Add day-of-week standouts
+    dayPatterns.dayOfWeek.forEach(p => {
+      const score = Math.abs(p.percentDiff / 10) * (p.p <= 0.01 ? 1.3 : 1.0);
+      allFindings.push({
+        type: 'dayStandout',
+        score,
+        data: p
+      });
+    });
+
+    // Add segmented correlations
+    segmented.forEach(s => {
+      const score = s.rDiff * 1.2; // Boost segmented findings as they show context
+      allFindings.push({
+        type: 'segmented',
+        score,
+        data: s
+      });
+    });
+
+    // Sort by score and pick top 3 discoveries
+    allFindings.sort((a, b) => b.score - a.score);
+    const topDiscoveries = allFindings.slice(0, 3);
+
+    // Organize correlations by target
+    const topDiscoveryIds = new Set(topDiscoveries.filter(f => f.type === 'correlation').map(f => f.data.id));
+    const remaining = qualityCorrelations.filter(c => !topDiscoveryIds.has(c.id));
 
     const sleepInsights = remaining.filter(c => c.target === 'sleep');
     const activityInsights = remaining.filter(c => c.target === 'activity');
+    const hrInsights = remaining.filter(c => c.target === 'hr');
 
-    // Further separate by strength
     const organizeSectionByStrength = (insights) => {
       const strong = insights.filter(c => c.strength === 'strong' || c.strength === 'moderate');
       const weak = insights.filter(c => c.strength === 'weak');
@@ -3385,8 +3433,16 @@
 
     return {
       topDiscoveries,
-      sleepInsights: organizeSectionByStrength(sleepInsights),
-      activityInsights: organizeSectionByStrength(activityInsights)
+      dayPatterns: {
+        weekendVsWeekday: dayPatterns.weekendVsWeekday,
+        dayOfWeek: dayPatterns.dayOfWeek
+      },
+      correlations: {
+        sleep: organizeSectionByStrength(sleepInsights),
+        activity: organizeSectionByStrength(activityInsights),
+        hr: organizeSectionByStrength(hrInsights)
+      },
+      segmented
     };
   }
 
