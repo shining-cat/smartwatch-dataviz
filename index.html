@@ -2238,18 +2238,50 @@
    */
   function defineMetricPairs() {
     return [
-      // Sleep as target (70% weight)
+      // ============================================
+      // SLEEP QUALITY INSIGHTS (Sleep HR as target)
+      // ============================================
+      { independent: "aggregates_steps", dependent: "sleep_avg_hr", lag: "same_day", target: "sleep", label: "Steps → Sleep HR" },
+      { independent: "workout_count", dependent: "sleep_avg_hr", lag: "same_day", target: "sleep", label: "Workout Count → Sleep HR" },
+      { independent: "workout_total_duration", dependent: "sleep_avg_hr", lag: "same_day", target: "sleep", label: "Workout Duration → Sleep HR" },
+      { independent: "workout_avg_hr", dependent: "sleep_avg_hr", lag: "same_day", target: "sleep", label: "Workout Intensity → Sleep HR" },
+      { independent: "sleep_duration_min", dependent: "sleep_avg_hr", lag: "same_day", target: "sleep", label: "Sleep Duration → Sleep HR" },
+
+      // ============================================
+      // SLEEP DURATION INSIGHTS (existing + new)
+      // ============================================
       { independent: "aggregates_steps", dependent: "sleep_duration_min", lag: "same_day", target: "sleep", label: "Steps → Sleep Duration" },
       { independent: "workout_count", dependent: "sleep_duration_min", lag: "same_day", target: "sleep", label: "Workout Count → Sleep Duration" },
       { independent: "workout_total_duration", dependent: "sleep_duration_min", lag: "same_day", target: "sleep", label: "Workout Duration → Sleep Duration" },
+      { independent: "workout_avg_hr", dependent: "sleep_duration_min", lag: "same_day", target: "sleep", label: "Workout Intensity → Sleep Duration" },
       { independent: "sleep_duration_min", dependent: "sleep_duration_min", lag: "previous_day", target: "sleep", label: "Sleep → Next Night's Sleep" },
+      { independent: "sleep_avg_hr", dependent: "sleep_duration_min", lag: "previous_day", target: "sleep", label: "Previous Sleep HR → Sleep Duration" },
+
+      // ============================================
+      // SLEEP TIMING INSIGHTS (existing + new)
+      // ============================================
       { independent: "aggregates_steps", dependent: "sleep_bedtime_min", lag: "same_day", target: "sleep", label: "Steps → Bedtime" },
       { independent: "workout_count", dependent: "sleep_bedtime_min", lag: "same_day", target: "sleep", label: "Workout Count → Bedtime" },
+      { independent: "workout_avg_hr", dependent: "sleep_bedtime_min", lag: "same_day", target: "sleep", label: "Workout Intensity → Bedtime" },
 
-      // Activity as target (30% weight)
+      // ============================================
+      // ACTIVITY INSIGHTS (Activity as target)
+      // ============================================
       { independent: "sleep_duration_min", dependent: "aggregates_steps", lag: "previous_day", target: "activity", label: "Sleep → Steps" },
+      { independent: "sleep_avg_hr", dependent: "aggregates_steps", lag: "previous_day", target: "activity", label: "Sleep HR → Steps" },
       { independent: "sleep_duration_min", dependent: "workout_count", lag: "previous_day", target: "activity", label: "Sleep → Workout Count" },
+      { independent: "sleep_avg_hr", dependent: "workout_count", lag: "previous_day", target: "activity", label: "Sleep HR → Workout Count" },
       { independent: "sleep_duration_min", dependent: "workout_total_duration", lag: "previous_day", target: "activity", label: "Sleep → Workout Duration" },
+      { independent: "sleep_avg_hr", dependent: "workout_total_duration", lag: "previous_day", target: "activity", label: "Sleep HR → Workout Duration" },
+
+      // ============================================
+      // HEART RATE RECOVERY INSIGHTS (HR as target)
+      // ============================================
+      { independent: "workout_avg_hr", dependent: "sleep_avg_hr", lag: "same_day", target: "hr", label: "Workout Intensity → Recovery HR" },
+      { independent: "aggregates_steps", dependent: "sleep_min_hr", lag: "same_day", target: "hr", label: "Steps → Resting HR" },
+      { independent: "sleep_duration_min", dependent: "workout_avg_hr", lag: "previous_day", target: "hr", label: "Sleep → Workout Intensity" },
+      { independent: "sleep_avg_hr", dependent: "workout_avg_hr", lag: "previous_day", target: "hr", label: "Sleep HR → Next Day Workout Intensity" },
+      { independent: "workout_total_duration", dependent: "sleep_avg_hr", lag: "same_day", target: "hr", label: "Workout Duration → Recovery HR" },
     ];
   }
 
@@ -2386,7 +2418,12 @@
       "sleep_duration_min": sleepDuration,
       "sleep_bedtime_min": bedtime,
       "workout_count": workoutAggregates.workout_count,
-      "workout_total_duration": workoutAggregates.workout_total_duration
+      "workout_total_duration": workoutAggregates.workout_total_duration,
+      "sleep_avg_hr": await fetchDailySeries("sleep_avg_hr"),
+      "sleep_min_hr": await fetchDailySeries("sleep_min_hr"),
+      "sleep_max_hr": await fetchDailySeries("sleep_max_hr"),
+      "workout_avg_hr": workoutAggregates.workout_avg_hr,
+      "workout_max_hr": workoutAggregates.workout_max_hr
     };
 
     const pairs = defineMetricPairs();
