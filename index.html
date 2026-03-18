@@ -2474,6 +2474,7 @@
         if (metricName === "workout_count" || metricName === "workout_total_duration" ||
             metricName === "workout_avg_hr" || metricName === "workout_max_hr") {
           const agg = await fetchWorkoutAggregates();
+          if (!agg) return null; // Handle fetch failure
           return agg[metricName];
         } else {
           return await fetchDailySeries(metricName);
@@ -2488,7 +2489,7 @@
 
       // Align time series
       const aligned = alignTimeSeries(indSeries, depSeries, corr.lag);
-      if (!aligned || aligned.x.length < 28) continue; // Need enough data
+      if (!aligned || aligned.x.length < 40) continue; // Need enough data (20 per segment minimum)
 
       // Split into weekend/weekday
       const weekendX = [], weekendY = [];
