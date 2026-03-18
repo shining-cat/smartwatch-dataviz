@@ -2452,6 +2452,108 @@
   }
 
   /**
+   * Calculate how correlations vary by weekend vs weekday
+   * @param {Array} correlations - Existing correlation objects
+   * @returns {Promise<Array>} Segmented correlation insights
+   */
+  async function calculateSegmentedCorrelations(correlations) {
+    console.log("Calculating segmented correlations...");
+
+    const segmented = [];
+    const sleepRecords = await db.sleepRecords.toArray();
+
+    // Create date-to-dayOfWeek lookup (optimized with Map)
+    const sleepRecordMap = new Map(sleepRecords.map(r => [r.date, r]));
+
+    for (const corr of correlations) {
+      // Only segment moderate/strong correlations
+      if (corr.strength === 'weak' || corr.strength === 'none') continue;
+
+      // Helper to fetch series by metric name
+      const fetchMetric = async (metricName) => {
+        if (metricName === "workout_count" || metricName === "workout_total_duration" ||
+            metricName === "workout_avg_hr" || metricName === "workout_max_hr") {
+          const agg = await fetchWorkoutAggregates();
+          return agg[metricName];
+        } else {
+          return await fetchDailySeries(metricName);
+        }
+      };
+
+      // Fetch metrics for this correlation
+      const indSeries = await fetchMetric(corr.independent);
+      const depSeries = await fetchMetric(corr.dependent);
+
+      if (!indSeries || !depSeries) continue;
+
+      // Align time series
+      const aligned = alignTimeSeries(indSeries, depSeries, corr.lag);
+      if (!aligned || aligned.x.length < 28) continue; // Need enough data
+
+      // Split into weekend/weekday
+      const weekendX = [], weekendY = [];
+      const weekdayX = [], weekdayY = [];
+
+      for (let i = 0; i < aligned.dates.length; i++) {
+        const date = aligned.dates[i];
+        const sleepRecord = sleepRecordMap.get(date);
+        if (!sleepRecord) continue;
+
+        const dayOfWeek = sleepRecord.dayOfWeek;
+        const isWeekend = dayOfWeek === 0 || dayOfWeek === 6; // Sunday or Saturday
+
+        const x = aligned.x[i];
+        const y = aligned.y[i];
+
+        if (x === null || y === null || isNaN(x) || isNaN(y)) continue;
+
+        if (isWeekend) {
+          weekendX.push(x);
+          weekendY.push(y);
+        } else {
+          weekdayX.push(x);
+          weekdayY.push(y);
+        }
+      }
+
+      // Calculate correlations for each segment
+      if (weekendX.length < 20 || weekdayX.length < 20) continue; // Minimum sample per segment
+
+      const weekendR = calculatePearsonCorrelation(weekendX, weekendY);
+      const weekdayR = calculatePearsonCorrelation(weekdayX, weekdayY);
+
+      if (weekendR === null || weekdayR === null) continue;
+
+      const rDiff = Math.abs(weekendR - weekdayR);
+
+      // Only report if difference is meaningful (≥0.15)
+      if (rDiff >= 0.15) {
+        const weekendStrength = classifyCorrelationStrength(weekendR);
+        const weekdayStrength = classifyCorrelationStrength(weekdayR);
+
+        segmented.push({
+          baseCorrelation: corr.label,
+          independent: corr.independent,
+          dependent: corr.dependent,
+          weekendR,
+          weekendStrength,
+          weekendN: weekendX.length,
+          weekdayR,
+          weekdayStrength,
+          weekdayN: weekdayX.length,
+          rDiff,
+          interpretation: Math.abs(weekdayR) > Math.abs(weekendR)
+            ? "Stronger on weekdays"
+            : "Stronger on weekends"
+        });
+      }
+    }
+
+    console.log(`Found ${segmented.length} segmented correlation patterns`);
+    return segmented;
+  }
+
+  /**
    * Align two time series by date, handling missing values
    * @param {Object} series1 - {dates: [...], values: [...]}
    * @param {Object} series2 - {dates: [...], values: [...]}
