@@ -2344,6 +2344,8 @@
 
     // Fetch sleep records for day-of-week grouping
     const sleepRecords = await db.sleepRecords.toArray();
+    // Build Map once for O(1) lookups instead of O(n) linear search
+    const sleepRecordMap = new Map(sleepRecords.map(r => [r.date, r]));
 
     for (const metric of metricsToAnalyze) {
       // Fetch metric data
@@ -2363,7 +2365,7 @@
         if (value === null || isNaN(value)) continue;
 
         // Find corresponding sleep record to get day of week
-        const sleepRecord = sleepRecords.find(r => r.date === date);
+        const sleepRecord = sleepRecordMap.get(date);
         if (!sleepRecord) continue;
 
         const dayOfWeek = sleepRecord.dayOfWeek;
