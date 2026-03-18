@@ -20,10 +20,11 @@ A browser-based tool that analyzes your smartwatch health export (sleep, activit
 - Nap filtering option
 
 **💡 Pattern Discovery**
-- Automatically finds correlations between your sleep and activity
-- "Does more exercise help me sleep better?" - answered with your own data
+- Automatically finds correlations between sleep, activity, and heart rate metrics
+- Detects weekend vs weekday patterns and day-of-week trends
+- Shows how relationships vary by context (e.g., "Steps → Sleep stronger on weekdays")
 - Statistical analysis with easy-to-understand visualizations
-- Shows what was analyzed even when no patterns are found
+- Transparent results - shows what was analyzed even when no patterns are found
 
 **📈 Timeline View**
 - Multi-metric time series with rolling averages
