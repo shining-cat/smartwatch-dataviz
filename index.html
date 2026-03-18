@@ -2322,6 +2322,134 @@
   }
 
   /**
+   * Calculate day-of-week patterns for all metrics
+   * @returns {Promise<Object>} {weekendVsWeekday: [...], dayOfWeek: [...]}
+   */
+  async function calculateDayPatterns() {
+    console.log("Calculating day patterns...");
+
+    const patterns = {
+      weekendVsWeekday: [],
+      dayOfWeek: []
+    };
+
+    // Metrics to analyze
+    const metricsToAnalyze = [
+      { name: "sleep_duration_min", label: "Sleep Duration", unit: "min", formatFn: (v) => `${Math.round(v / 60 * 10) / 10}h` },
+      { name: "sleep_avg_hr", label: "Sleep Heart Rate", unit: "bpm", formatFn: (v) => `${Math.round(v)} bpm` },
+      { name: "aggregates_steps", label: "Steps", unit: "steps", formatFn: (v) => `${Math.round(v).toLocaleString()} steps` },
+      { name: "workout_count", label: "Workouts", unit: "count", formatFn: (v) => `${Math.round(v * 10) / 10}` },
+      { name: "workout_avg_hr", label: "Workout Heart Rate", unit: "bpm", formatFn: (v) => `${Math.round(v)} bpm` }
+    ];
+
+    // Fetch sleep records for day-of-week grouping
+    const sleepRecords = await db.sleepRecords.toArray();
+
+    for (const metric of metricsToAnalyze) {
+      // Fetch metric data
+      const series = await fetchDailySeries(metric.name);
+      if (!series || series.values.length < 28) continue; // Need at least 4 weeks
+
+      // Group by weekend vs weekday
+      const weekendValues = [];
+      const weekdayValues = [];
+
+      // Group by day of week (0=Sunday, 1=Monday, ..., 6=Saturday)
+      const dayGroups = Array.from({ length: 7 }, () => []);
+
+      for (let i = 0; i < series.dates.length; i++) {
+        const date = series.dates[i];
+        const value = series.values[i];
+        if (value === null || isNaN(value)) continue;
+
+        // Find corresponding sleep record to get day of week
+        const sleepRecord = sleepRecords.find(r => r.date === date);
+        if (!sleepRecord) continue;
+
+        const dayOfWeek = sleepRecord.dayOfWeek;
+        const isWeekend = dayOfWeek === 0 || dayOfWeek === 6; // Sunday or Saturday
+
+        if (isWeekend) {
+          weekendValues.push(value);
+        } else {
+          weekdayValues.push(value);
+        }
+
+        dayGroups[dayOfWeek].push(value);
+      }
+
+      // Weekend vs Weekday t-test
+      if (weekendValues.length >= 10 && weekdayValues.length >= 10) {
+        const tTestResult = tTest(weekendValues, weekdayValues);
+        if (tTestResult && tTestResult.p <= 0.05) {
+          const effectSize = cohensD(weekendValues, weekdayValues);
+          const effectMagnitude = classifyEffectSize(effectSize);
+
+          patterns.weekendVsWeekday.push({
+            metric: metric.name,
+            label: metric.label,
+            unit: metric.unit,
+            formatFn: metric.formatFn,
+            weekendMean: tTestResult.mean1,
+            weekdayMean: tTestResult.mean2,
+            diff: tTestResult.diff,
+            p: tTestResult.p,
+            effectSize,
+            effectMagnitude,
+            weekendN: tTestResult.n1,
+            weekdayN: tTestResult.n2
+          });
+        }
+      }
+
+      // Day-of-week patterns - find days that stand out
+      const allValues = series.values.filter(v => v !== null && !isNaN(v));
+      const overallMean = calculateMean(allValues);
+      if (overallMean === null) continue;
+
+      const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+      for (let day = 0; day < 7; day++) {
+        const dayValues = dayGroups[day];
+        if (dayValues.length < 10) continue; // Need minimum sample size
+
+        const dayMean = calculateMean(dayValues);
+        const diff = dayMean - overallMean;
+        const percentDiff = (diff / overallMean) * 100;
+
+        // Only report if difference is meaningful (>10% or significant t-test vs rest)
+        if (Math.abs(percentDiff) > 10) {
+          // Create "rest of week" group
+          const restValues = [];
+          for (let otherDay = 0; otherDay < 7; otherDay++) {
+            if (otherDay !== day) restValues.push(...dayGroups[otherDay]);
+          }
+
+          const tTestResult = tTest(dayValues, restValues);
+          if (tTestResult && tTestResult.p <= 0.05) {
+            patterns.dayOfWeek.push({
+              metric: metric.name,
+              label: metric.label,
+              unit: metric.unit,
+              formatFn: metric.formatFn,
+              day: dayNames[day],
+              dayMean,
+              overallMean,
+              diff,
+              percentDiff,
+              p: tTestResult.p,
+              n: dayValues.length
+            });
+          }
+        }
+      }
+    }
+
+    console.log(`Found ${patterns.weekendVsWeekday.length} weekend/weekday patterns, ${patterns.dayOfWeek.length} day-of-week standouts`);
+    return patterns;
+  }
+
+  /**
    * Align two time series by date, handling missing values
    * @param {Object} series1 - {dates: [...], values: [...]}
    * @param {Object} series2 - {dates: [...], values: [...]}
