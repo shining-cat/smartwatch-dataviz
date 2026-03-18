@@ -2255,7 +2255,7 @@
 
   /**
    * Calculate daily workout aggregates from activity records
-   * @returns {Promise<Object>} {workout_count: {dates, values}, workout_total_duration: {dates, values}}
+   * @returns {Promise<Object>} {workout_count, workout_total_duration, workout_avg_hr, workout_max_hr}
    */
   async function fetchWorkoutAggregates() {
     const records = await db.activityRecords.toArray();
@@ -2267,11 +2267,21 @@
       const date = record.date;
       if (!date) continue; // Skip records with missing dates
       if (!dailyMap.has(date)) {
-        dailyMap.set(date, { count: 0, totalDuration: 0 });
+        dailyMap.set(date, { count: 0, totalDuration: 0, hrValues: [], maxHR: null });
       }
       const day = dailyMap.get(date);
       day.count++;
       day.totalDuration += record.durationMinutes || 0;
+
+      // Collect HR values for averaging
+      if (record.hrAverage !== null && !isNaN(record.hrAverage)) {
+        day.hrValues.push(record.hrAverage);
+      }
+
+      // Track max HR across all workouts
+      if (record.hrMax !== null && !isNaN(record.hrMax)) {
+        day.maxHR = day.maxHR === null ? record.hrMax : Math.max(day.maxHR, record.hrMax);
+      }
     }
 
     // Convert to series format
@@ -2279,9 +2289,22 @@
     const countValues = dates.map(d => dailyMap.get(d).count);
     const durationValues = dates.map(d => dailyMap.get(d).totalDuration);
 
+    // Calculate average HR across all workouts that day
+    const avgHRValues = dates.map(d => {
+      const hrValues = dailyMap.get(d).hrValues;
+      if (hrValues.length === 0) return null;
+      const sum = hrValues.reduce((acc, val) => acc + val, 0);
+      return sum / hrValues.length;
+    });
+
+    // Max HR across all workouts that day
+    const maxHRValues = dates.map(d => dailyMap.get(d).maxHR);
+
     return {
       workout_count: { dates, values: countValues },
-      workout_total_duration: { dates, values: durationValues }
+      workout_total_duration: { dates, values: durationValues },
+      workout_avg_hr: { dates, values: avgHRValues },
+      workout_max_hr: { dates, values: maxHRValues }
     };
   }
 
