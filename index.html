@@ -381,28 +381,45 @@
           </div>
         </div>
 
-        <!-- Top Discoveries -->
+        <!-- 1. TOP DISCOVERIES -->
         <div class="card" style="margin-bottom: 16px;">
-          <h2 style="margin-bottom: 12px; text-transform: uppercase; letter-spacing: 1px; color: #3aa0ff; font-size: 13px;">✨ Top Discoveries</h2>
+          <h2>Top Discoveries</h2>
           <div id="correlationTopDiscoveries"></div>
         </div>
 
-        <!-- Sleep Insights -->
-        <div class="card" style="margin-bottom: 16px;">
-          <h2 style="margin-bottom: 12px; text-transform: uppercase; letter-spacing: 1px; color: #3aa0ff; font-size: 13px;">😴 What Affects Your Sleep</h2>
-          <div id="correlationSleepInsights"></div>
-          <div id="correlationSleepShowMore" style="margin-top: 12px; text-align: center; display: none;">
-            <button id="btnShowMoreSleep" style="font-size: 12px;">Show more patterns ▼</button>
+        <!-- 2. DAY PATTERNS (NEW) -->
+        <div style="margin-bottom: 16px;">
+          <h2 style="margin: 0 0 12px 0; font-size: 16px; color: var(--fg); font-weight: 600;">Day Patterns</h2>
+          <div id="correlationDayPatterns"></div>
+        </div>
+
+        <!-- 3. METRIC CORRELATIONS -->
+        <div style="margin-bottom: 16px;">
+          <h2 style="margin: 0 0 12px 0; font-size: 16px; color: var(--fg); font-weight: 600;">Metric Correlations</h2>
+
+          <!-- Sleep Insights -->
+          <div class="card" style="margin-bottom: 12px;">
+            <h3 style="margin: 0 0 10px 0; font-size: 14px; color: var(--muted); font-weight: 600;">Sleep Quality Insights</h3>
+            <div id="correlationSleepInsights"></div>
+          </div>
+
+          <!-- Activity Insights -->
+          <div class="card" style="margin-bottom: 12px;">
+            <h3 style="margin: 0 0 10px 0; font-size: 14px; color: var(--muted); font-weight: 600;">Activity Insights</h3>
+            <div id="correlationActivityInsights"></div>
+          </div>
+
+          <!-- Heart Rate Insights (NEW) -->
+          <div class="card">
+            <h3 style="margin: 0 0 10px 0; font-size: 14px; color: var(--muted); font-weight: 600;">Heart Rate Insights</h3>
+            <div id="correlationHRInsights"></div>
           </div>
         </div>
 
-        <!-- Activity Insights -->
-        <div class="card" style="margin-bottom: 16px;">
-          <h2 style="margin-bottom: 12px; text-transform: uppercase; letter-spacing: 1px; color: #3aa0ff; font-size: 13px;">📊 What Drives Your Activity</h2>
-          <div id="correlationActivityInsights"></div>
-          <div id="correlationActivityShowMore" style="margin-top: 12px; text-align: center; display: none;">
-            <button id="btnShowMoreActivity" style="font-size: 12px;">Show more patterns ▼</button>
-          </div>
+        <!-- 4. CONTEXT MATTERS - Segmented Insights (NEW) -->
+        <div style="margin-bottom: 16px;">
+          <h2 style="margin: 0 0 12px 0; font-size: 16px; color: var(--fg); font-weight: 600;">Context Matters</h2>
+          <div id="correlationSegmentedInsights"></div>
         </div>
       </div>
 
@@ -5810,106 +5827,97 @@
   /**
    * Main correlation dashboard rendering function
    */
+  /**
+   * Main correlation dashboard rendering function - orchestrates all analysis
+   */
   async function renderCorrelationDashboard() {
     console.log("Rendering correlation dashboard...");
 
-    // Show loading state
+    // Get DOM containers
     const topContainer = $("correlationTopDiscoveries");
+    const dayPatternsContainer = $("correlationDayPatterns");
     const sleepContainer = $("correlationSleepInsights");
     const activityContainer = $("correlationActivityInsights");
-
-    if (topContainer) topContainer.innerHTML = '<div style="text-align:center; padding:40px; color:var(--muted);">Analyzing your patterns...</div>';
-    if (sleepContainer) sleepContainer.innerHTML = '';
-    if (activityContainer) activityContainer.innerHTML = '';
+    const hrContainer = $("correlationHRInsights");
+    const segmentedContainer = $("correlationSegmentedInsights");
 
     try {
-      // Calculate all correlations
-      const correlations = await calculateAllCorrelations();
+      // Calculate all three analysis types in parallel
+      const [correlations, dayPatterns] = await Promise.all([
+        calculateAllCorrelations(),
+        calculateDayPatterns()
+      ]);
 
-      // Cache for scatter plot access
+      // Calculate segmented correlations (depends on correlations)
+      const segmented = await calculateSegmentedCorrelations(correlations);
+
+      // Cache for scatter plot rendering
       window.cachedCorrelations = correlations;
 
-      // Check if we have any correlations
-      if (correlations.length === 0) {
-        if (topContainer) {
-          topContainer.innerHTML = renderAnalysisResults();
-        }
+      // Check if we have any findings at all
+      const hasFindings = correlations.length > 0 ||
+                         dayPatterns.weekendVsWeekday.length > 0 ||
+                         dayPatterns.dayOfWeek.length > 0 ||
+                         segmented.length > 0;
+
+      if (!hasFindings) {
+        if (topContainer) topContainer.innerHTML = renderAnalysisResults();
+        if (dayPatternsContainer) dayPatternsContainer.innerHTML = '';
         if (sleepContainer) sleepContainer.innerHTML = '';
         if (activityContainer) activityContainer.innerHTML = '';
+        if (hrContainer) hrContainer.innerHTML = '';
+        if (segmentedContainer) segmentedContainer.innerHTML = '';
         return;
       }
 
-      // Organize correlations
-      const organized = organizeCorrelations(correlations, 3);
+      // Organize all insights
+      const organized = organizeAllInsights(correlations, dayPatterns, segmented);
 
-      // Render top discoveries
-      if (organized.topDiscoveries.length > 0) {
-        const topHtml = organized.topDiscoveries.map(c => renderPatternCard(c, true)).join('');
-        if (topContainer) topContainer.innerHTML = topHtml;
-      } else {
-        if (topContainer) topContainer.innerHTML = renderAnalysisResults();
+      // Render Top Discoveries
+      if (topContainer && organized.topDiscoveries.length > 0) {
+        renderTopDiscoveries(organized.topDiscoveries, topContainer);
+      } else if (topContainer) {
+        topContainer.innerHTML = '';
       }
 
-      // Render sleep insights
-      if (organized.sleepInsights.strong.length > 0) {
-        const sleepHtml = organized.sleepInsights.strong.map(c => renderPatternCard(c, false)).join('');
-        if (sleepContainer) sleepContainer.innerHTML = sleepHtml;
-
-        // Show "show more" if weak patterns exist
-        if (organized.sleepInsights.weak.length > 0) {
-          const showMoreContainer = $("correlationSleepShowMore");
-          if (showMoreContainer) {
-            showMoreContainer.style.display = 'block';
-            const btn = $("btnShowMoreSleep");
-            if (btn) {
-              btn.onclick = () => {
-                const weakHtml = organized.sleepInsights.weak.map(c => renderPatternCard(c, false)).join('');
-                if (sleepContainer) sleepContainer.innerHTML += weakHtml;
-                showMoreContainer.style.display = 'none';
-              };
-            }
-          }
-        }
-      } else if (organized.sleepInsights.weak.length > 0) {
-        // Only weak patterns available - show educational fallback first
-        if (sleepContainer) {
-          sleepContainer.innerHTML = renderEducationalFallback(30) + '<div style="margin-top: 20px;"></div>';
-          const weakHtml = organized.sleepInsights.weak.map(c => renderPatternCard(c, false)).join('');
-          sleepContainer.innerHTML += `<div style="opacity: 0.7;">${weakHtml}</div>`;
-        }
-      } else {
-        if (sleepContainer) sleepContainer.innerHTML = '<div class="muted" style="text-align:center; padding:20px;">Keep tracking to unlock sleep insights</div>';
+      // Render Day Patterns
+      if (dayPatternsContainer) {
+        renderDayPatternsSection(organized.dayPatterns, dayPatternsContainer);
       }
 
-      // Render activity insights
-      if (organized.activityInsights.strong.length > 0) {
-        const activityHtml = organized.activityInsights.strong.map(c => renderPatternCard(c, false)).join('');
-        if (activityContainer) activityContainer.innerHTML = activityHtml;
+      // Render Metric Correlations - Sleep
+      if (sleepContainer) {
+        if (organized.correlations.sleep.strong.length > 0) {
+          const html = organized.correlations.sleep.strong.map(c => renderPatternCard(c, false)).join('');
+          sleepContainer.innerHTML = html;
+        } else {
+          sleepContainer.innerHTML = '<div class="muted" style="text-align:center; padding:20px;">No significant sleep correlations found</div>';
+        }
+      }
 
-        // Show "show more" if weak patterns exist
-        if (organized.activityInsights.weak.length > 0) {
-          const showMoreContainer = $("correlationActivityShowMore");
-          if (showMoreContainer) {
-            showMoreContainer.style.display = 'block';
-            const btn = $("btnShowMoreActivity");
-            if (btn) {
-              btn.onclick = () => {
-                const weakHtml = organized.activityInsights.weak.map(c => renderPatternCard(c, false)).join('');
-                if (activityContainer) activityContainer.innerHTML += weakHtml;
-                showMoreContainer.style.display = 'none';
-              };
-            }
-          }
+      // Render Metric Correlations - Activity
+      if (activityContainer) {
+        if (organized.correlations.activity.strong.length > 0) {
+          const html = organized.correlations.activity.strong.map(c => renderPatternCard(c, false)).join('');
+          activityContainer.innerHTML = html;
+        } else {
+          activityContainer.innerHTML = '<div class="muted" style="text-align:center; padding:20px;">No significant activity correlations found</div>';
         }
-      } else if (organized.activityInsights.weak.length > 0) {
-        // Only weak patterns - show educational fallback first
-        if (activityContainer) {
-          activityContainer.innerHTML = renderEducationalFallback(30) + '<div style="margin-top: 20px;"></div>';
-          const weakHtml = organized.activityInsights.weak.map(c => renderPatternCard(c, false)).join('');
-          activityContainer.innerHTML += `<div style="opacity: 0.7;">${weakHtml}</div>`;
+      }
+
+      // Render Metric Correlations - Heart Rate (NEW)
+      if (hrContainer) {
+        if (organized.correlations.hr.strong.length > 0) {
+          const html = organized.correlations.hr.strong.map(c => renderPatternCard(c, false)).join('');
+          hrContainer.innerHTML = html;
+        } else {
+          hrContainer.innerHTML = '<div class="muted" style="text-align:center; padding:20px;">No significant heart rate correlations found</div>';
         }
-      } else {
-        if (activityContainer) activityContainer.innerHTML = '<div class="muted" style="text-align:center; padding:20px;">Keep tracking to unlock activity insights</div>';
+      }
+
+      // Render Segmented Insights
+      if (segmentedContainer) {
+        renderSegmentedSection(organized.segmented, segmentedContainer);
       }
 
       console.log("Correlation dashboard rendered");
