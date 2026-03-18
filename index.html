@@ -3447,6 +3447,283 @@
   }
 
   /**
+   * Render Day Patterns section
+   * @param {Object} dayPatterns - {weekendVsWeekday: [], dayOfWeek: []}
+   * @param {HTMLElement} container - DOM container element
+   */
+  function renderDayPatternsSection(dayPatterns, container) {
+    if (!container) return;
+
+    container.innerHTML = '';
+
+    const hasWeekendPatterns = dayPatterns.weekendVsWeekday.length > 0;
+    const hasDayPatterns = dayPatterns.dayOfWeek.length > 0;
+
+    if (!hasWeekendPatterns && !hasDayPatterns) {
+      container.innerHTML = '<div class="muted" style="text-align:center; padding:40px;">No significant day patterns found. Keep tracking!</div>';
+      return;
+    }
+
+    let html = '';
+
+    // Weekend vs Weekday patterns
+    if (hasWeekendPatterns) {
+      html += `
+        <div class="card" style="margin-bottom: 16px;">
+          <h3 style="margin: 0 0 12px 0; font-size: 15px; font-weight: 600;">Weekend vs Weekday</h3>
+          <div style="display: flex; flex-direction: column; gap: 12px;">
+      `;
+
+      dayPatterns.weekendVsWeekday.forEach(pattern => {
+        const direction = pattern.diff > 0 ? 'higher' : 'lower';
+        const arrow = pattern.diff > 0 ? '↑' : '↓';
+        const color = pattern.diff > 0 ? 'var(--good)' : 'var(--accent)';
+        const pStar = pattern.p <= 0.01 ? '**' : '*';
+
+        html += `
+          <div style="background: #0f1521; border: 1px solid #223046; border-radius: 8px; padding: 12px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+              <strong style="font-size: 14px;">${pattern.label}</strong>
+              <span style="color: ${color}; font-size: 14px; font-weight: 600;">${arrow} ${pattern.formatFn(Math.abs(pattern.diff))}</span>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 13px;">
+              <div>
+                <div style="color: var(--muted);">Weekend</div>
+                <div style="font-weight: 600;">${pattern.formatFn(pattern.weekendMean)}</div>
+              </div>
+              <div>
+                <div style="color: var(--muted);">Weekday</div>
+                <div style="font-weight: 600;">${pattern.formatFn(pattern.weekdayMean)}</div>
+              </div>
+            </div>
+            <div style="margin-top: 8px; font-size: 12px; color: var(--muted);">
+              ${pattern.effectMagnitude} effect (d=${pattern.effectSize.toFixed(2)})${pStar}
+            </div>
+          </div>
+        `;
+      });
+
+      html += `
+          </div>
+        </div>
+      `;
+    }
+
+    // Day-of-week standouts
+    if (hasDayPatterns) {
+      html += `
+        <div class="card">
+          <h3 style="margin: 0 0 12px 0; font-size: 15px; font-weight: 600;">Day-of-Week Standouts</h3>
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+      `;
+
+      dayPatterns.dayOfWeek.forEach(pattern => {
+        const direction = pattern.diff > 0 ? 'above' : 'below';
+        const arrow = pattern.diff > 0 ? '↑' : '↓';
+        const color = pattern.diff > 0 ? 'var(--good)' : 'var(--warn)';
+
+        html += `
+          <div style="background: #0f1521; border: 1px solid #223046; border-radius: 8px; padding: 10px; display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <strong style="font-size: 13px;">${pattern.day}s: ${pattern.label}</strong>
+              <div style="font-size: 12px; color: var(--muted); margin-top: 2px;">
+                ${pattern.formatFn(pattern.dayMean)} vs ${pattern.formatFn(pattern.overallMean)} weekly avg
+              </div>
+            </div>
+            <div style="text-align: right;">
+              <div style="color: ${color}; font-weight: 600; font-size: 14px;">
+                ${arrow} ${pattern.formatFn(Math.abs(pattern.diff))}
+              </div>
+              <div style="font-size: 11px; color: var(--muted);">
+                ${Math.abs(pattern.percentDiff).toFixed(0)}% ${direction}
+              </div>
+            </div>
+          </div>
+        `;
+      });
+
+      html += `
+          </div>
+        </div>
+      `;
+    }
+
+    container.innerHTML = html;
+  }
+
+  /**
+   * Render Segmented Insights section
+   * @param {Array} segmented - Segmented correlation objects
+   * @param {HTMLElement} container - DOM container element
+   */
+  function renderSegmentedSection(segmented, container) {
+    if (!container) return;
+
+    container.innerHTML = '';
+
+    if (segmented.length === 0) {
+      container.innerHTML = '<div class="muted" style="text-align:center; padding:40px;">No context-dependent correlations found</div>';
+      return;
+    }
+
+    let html = `
+      <div class="card">
+        <h3 style="margin: 0 0 12px 0; font-size: 15px; font-weight: 600;">How Correlations Vary by Context</h3>
+        <div style="display: flex; flex-direction: column; gap: 12px;">
+    `;
+
+    segmented.forEach(seg => {
+      const strongerContext = Math.abs(seg.weekdayR) > Math.abs(seg.weekendR) ? 'weekday' : 'weekend';
+
+      html += `
+        <div style="background: #0f1521; border: 1px solid #223046; border-radius: 8px; padding: 12px;">
+          <div style="margin-bottom: 10px;">
+            <strong style="font-size: 14px;">${seg.baseCorrelation}</strong>
+            <div style="font-size: 12px; color: var(--muted); margin-top: 4px;">${seg.interpretation}</div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 8px;">
+            <div style="background: ${strongerContext === 'weekday' ? 'rgba(58,160,255,0.08)' : '#0b1018'}; border: 1px solid ${strongerContext === 'weekday' ? '#2b66b6' : '#1a2332'}; border-radius: 6px; padding: 8px;">
+              <div style="font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px;">Weekday</div>
+              <div style="font-weight: 600; margin-top: 4px;">r = ${seg.weekdayR.toFixed(3)}</div>
+              <div style="font-size: 11px; color: var(--muted); margin-top: 2px;">${seg.weekdayStrength}</div>
+              <div style="font-size: 11px; color: var(--muted);">n = ${seg.weekdayN}</div>
+            </div>
+
+            <div style="background: ${strongerContext === 'weekend' ? 'rgba(58,160,255,0.08)' : '#0b1018'}; border: 1px solid ${strongerContext === 'weekend' ? '#2b66b6' : '#1a2332'}; border-radius: 6px; padding: 8px;">
+              <div style="font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px;">Weekend</div>
+              <div style="font-weight: 600; margin-top: 4px;">r = ${seg.weekendR.toFixed(3)}</div>
+              <div style="font-size: 11px; color: var(--muted); margin-top: 2px;">${seg.weekendStrength}</div>
+              <div style="font-size: 11px; color: var(--muted);">n = ${seg.weekendN}</div>
+            </div>
+          </div>
+
+          <div style="margin-top: 8px; font-size: 12px; color: var(--muted);">
+            Difference: Δr = ${seg.rDiff.toFixed(3)}
+          </div>
+        </div>
+      `;
+    });
+
+    html += `
+        </div>
+      </div>
+    `;
+
+    container.innerHTML = html;
+  }
+
+  /**
+   * Render Top Discoveries section (mixed finding types)
+   * @param {Array} topDiscoveries - Array of {type, score, data} objects
+   * @param {HTMLElement} container - DOM container element
+   */
+  function renderTopDiscoveries(topDiscoveries, container) {
+    if (!container) return;
+
+    container.innerHTML = '';
+
+    if (topDiscoveries.length === 0) {
+      return; // Don't show empty state - let individual sections handle it
+    }
+
+    let html = '';
+
+    topDiscoveries.forEach((finding) => {
+      const badge = finding.type === 'correlation' ? '📊 Correlation' :
+                    finding.type === 'weekendVsWeekday' ? '📅 Day Pattern' :
+                    finding.type === 'dayStandout' ? '📅 Day Pattern' :
+                    finding.type === 'segmented' ? '🔍 Segmented' : '';
+
+      html += `<div style="margin-bottom: 12px; padding: 2px 0;">`;
+      html += `<div style="font-size: 11px; color: var(--muted); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.8px;">${badge}</div>`;
+
+      if (finding.type === 'correlation') {
+        html += renderPatternCard(finding.data, true);
+      } else if (finding.type === 'weekendVsWeekday') {
+        const p = finding.data;
+        const direction = p.diff > 0 ? 'higher' : 'lower';
+        const arrow = p.diff > 0 ? '↑' : '↓';
+        const color = p.diff > 0 ? 'var(--good)' : 'var(--accent)';
+
+        html += `
+          <div class="correlation-pattern-card" style="background: linear-gradient(135deg, rgba(58,160,255,0.08), rgba(61,206,121,0.06)); border: 2px solid #2b66b6; box-shadow: 0 4px 12px rgba(58,160,255,0.15); border-radius: 12px; padding: 16px; margin-bottom: 12px;">
+            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 10px;">
+              <div>
+                <strong style="font-size: 15px;">${p.label}</strong>
+                <div style="font-size: 13px; color: var(--muted); margin-top: 4px;">Weekend vs Weekday difference</div>
+              </div>
+              <span style="color: ${color}; font-size: 16px; font-weight: 700;">${arrow} ${p.formatFn(Math.abs(p.diff))}</span>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px;">
+              <div style="background: rgba(0,0,0,0.2); border-radius: 6px; padding: 8px;">
+                <div style="color: var(--muted); font-size: 12px;">Weekend</div>
+                <div style="font-weight: 600; font-size: 14px; margin-top: 2px;">${p.formatFn(p.weekendMean)}</div>
+              </div>
+              <div style="background: rgba(0,0,0,0.2); border-radius: 6px; padding: 8px;">
+                <div style="color: var(--muted); font-size: 12px;">Weekday</div>
+                <div style="font-weight: 600; font-size: 14px; margin-top: 2px;">${p.formatFn(p.weekdayMean)}</div>
+              </div>
+            </div>
+            <div style="margin-top: 10px; font-size: 12px; color: var(--muted);">
+              ${p.effectMagnitude} effect (n=${p.weekendN + p.weekdayN})
+            </div>
+          </div>
+        `;
+      } else if (finding.type === 'dayStandout') {
+        const p = finding.data;
+        const arrow = p.diff > 0 ? '↑' : '↓';
+        const color = p.diff > 0 ? 'var(--good)' : 'var(--warn)';
+
+        html += `
+          <div class="correlation-pattern-card" style="background: linear-gradient(135deg, rgba(255,191,58,0.1), rgba(58,160,255,0.06)); border: 2px solid rgba(255,191,58,0.4); box-shadow: 0 4px 12px rgba(255,191,58,0.12); border-radius: 12px; padding: 16px; margin-bottom: 12px;">
+            <div style="display: flex; justify-content: space-between; align-items: start;">
+              <div>
+                <strong style="font-size: 15px;">${p.day}s: ${p.label}</strong>
+                <div style="font-size: 13px; color: var(--muted); margin-top: 4px;">
+                  ${p.formatFn(p.dayMean)} vs ${p.formatFn(p.overallMean)} weekly average
+                </div>
+              </div>
+              <div style="text-align: right;">
+                <div style="color: ${color}; font-weight: 700; font-size: 16px;">
+                  ${arrow} ${p.formatFn(Math.abs(p.diff))}
+                </div>
+                <div style="font-size: 12px; color: var(--muted);">
+                  ${Math.abs(p.percentDiff).toFixed(0)}% different
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+      } else if (finding.type === 'segmented') {
+        const s = finding.data;
+        html += `
+          <div class="correlation-pattern-card" style="background: linear-gradient(135deg, rgba(147,51,234,0.08), rgba(58,160,255,0.06)); border: 2px solid rgba(147,51,234,0.4); box-shadow: 0 4px 12px rgba(147,51,234,0.12); border-radius: 12px; padding: 16px; margin-bottom: 12px;">
+            <strong style="font-size: 15px;">${s.baseCorrelation}</strong>
+            <div style="font-size: 13px; color: var(--muted); margin-top: 4px; margin-bottom: 12px;">${s.interpretation}</div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+              <div style="background: rgba(0,0,0,0.2); border-radius: 6px; padding: 8px;">
+                <div style="font-size: 11px; color: var(--muted);">WEEKDAY</div>
+                <div style="font-weight: 600; margin-top: 4px;">r = ${s.weekdayR.toFixed(3)}</div>
+                <div style="font-size: 11px; color: var(--muted);">${s.weekdayStrength}</div>
+              </div>
+              <div style="background: rgba(0,0,0,0.2); border-radius: 6px; padding: 8px;">
+                <div style="font-size: 11px; color: var(--muted);">WEEKEND</div>
+                <div style="font-weight: 600; margin-top: 4px;">r = ${s.weekendR.toFixed(3)}</div>
+                <div style="font-size: 11px; color: var(--muted);">${s.weekendStrength}</div>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+
+      html += `</div>`;
+    });
+
+    container.innerHTML = html;
+  }
+
+  /**
    * Render educational fallback when no correlations found
    * @param {number} minDaysNeeded - Days needed to unlock correlations
    * @returns {string} HTML string
