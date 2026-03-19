@@ -2355,7 +2355,8 @@
     // Metrics to analyze
     const metricsToAnalyze = [
       { name: "sleep_duration_min", label: "Sleep Duration", unit: "min", formatFn: (v) => `${Math.round(v / 60 * 10) / 10}h` },
-      { name: "sleep_avg_hr", label: "Sleep Heart Rate", unit: "bpm", formatFn: (v) => `${Math.round(v)} bpm` },
+      { name: "sleep_avg_hr", label: "Sleep Heart Rate (Avg)", unit: "bpm", formatFn: (v) => `${Math.round(v)} bpm` },
+      { name: "sleep_min_hr", label: "Resting Heart Rate", unit: "bpm", formatFn: (v) => `${Math.round(v)} bpm` },
       { name: "aggregates_steps", label: "Steps", unit: "steps", formatFn: (v) => `${Math.round(v).toLocaleString()} steps` },
       { name: "workout_count", label: "Workouts", unit: "count", formatFn: (v) => `${Math.round(v * 10) / 10}` },
       { name: "workout_avg_hr", label: "Workout Heart Rate", unit: "bpm", formatFn: (v) => `${Math.round(v)} bpm` }
