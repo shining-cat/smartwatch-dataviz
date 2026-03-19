@@ -2435,33 +2435,44 @@
         if (dayValues.length < 10) continue; // Need minimum sample size
 
         const dayMean = calculateMean(dayValues);
+        if (dayMean === null) continue;
+
         const diff = dayMean - overallMean;
         const percentDiff = (diff / overallMean) * 100;
 
-        // Only report if difference is meaningful (>10% or significant t-test vs rest)
-        if (Math.abs(percentDiff) > 10) {
-          // Create "rest of week" group
-          const restValues = [];
-          for (let otherDay = 0; otherDay < 7; otherDay++) {
-            if (otherDay !== day) restValues.push(...dayGroups[otherDay]);
+        // Create "rest of week" group for t-test
+        const restValues = [];
+        for (let otherDay = 0; otherDay < 7; otherDay++) {
+          if (otherDay !== day) restValues.push(...dayGroups[otherDay]);
+        }
+
+        const tTestResult = tTest(dayValues, restValues);
+        if (tTestResult && tTestResult.p <= 0.05) {
+          // Tiered categorization based on effect size and significance
+          let tier;
+          const absPercent = Math.abs(percentDiff);
+          if (absPercent > 10 && tTestResult.p <= 0.01) {
+            tier = 'strong'; // Large difference, highly significant
+          } else if (absPercent > 5 || (absPercent > 3 && tTestResult.p <= 0.01)) {
+            tier = 'moderate'; // Medium difference or small but highly significant
+          } else {
+            tier = 'subtle'; // Statistically significant but small difference
           }
 
-          const tTestResult = tTest(dayValues, restValues);
-          if (tTestResult && tTestResult.p <= 0.05) {
-            patterns.dayOfWeek.push({
-              metric: metric.name,
-              label: metric.label,
-              unit: metric.unit,
-              formatFn: metric.formatFn,
-              day: dayNames[day],
-              dayMean,
-              overallMean,
-              diff,
-              percentDiff,
-              p: tTestResult.p,
-              n: dayValues.length
-            });
-          }
+          patterns.dayOfWeek.push({
+            metric: metric.name,
+            label: metric.label,
+            unit: metric.unit,
+            formatFn: metric.formatFn,
+            day: dayNames[day],
+            dayMean,
+            overallMean,
+            diff,
+            percentDiff,
+            p: tTestResult.p,
+            n: dayValues.length,
+            tier // NEW: strength classification
+          });
         }
       }
     }
@@ -3544,39 +3555,68 @@
 
     // Day-of-week standouts
     if (hasDayPatterns) {
+      // Group patterns by tier
+      const strongPatterns = dayPatterns.dayOfWeek.filter(p => p.tier === 'strong');
+      const moderatePatterns = dayPatterns.dayOfWeek.filter(p => p.tier === 'moderate');
+      const subtlePatterns = dayPatterns.dayOfWeek.filter(p => p.tier === 'subtle');
+
       html += `
         <div class="card">
           <h3 style="margin: 0 0 12px 0; font-size: 15px; font-weight: 600;">Day-of-Week Standouts</h3>
-          <div style="display: flex; flex-direction: column; gap: 8px;">
       `;
 
-      dayPatterns.dayOfWeek.forEach(pattern => {
-        const direction = pattern.diff > 0 ? 'above' : 'below';
-        const arrow = pattern.diff > 0 ? '↑' : '↓';
-        const color = pattern.diff > 0 ? 'var(--good)' : 'var(--warn)';
+      // Helper function to render a tier section
+      const renderTier = (patterns, tierLabel, tierColor, tierBadgeColor, tierDescription) => {
+        if (patterns.length === 0) return '';
 
-        html += `
-          <div style="background: #0f1521; border: 1px solid #223046; border-radius: 8px; padding: 10px; display: flex; justify-content: space-between; align-items: center;">
-            <div>
-              <strong style="font-size: 13px;">${pattern.day}s: ${pattern.label}</strong>
-              <div style="font-size: 12px; color: var(--muted); margin-top: 2px;">
-                ${pattern.formatFn(pattern.dayMean)} vs ${pattern.formatFn(pattern.overallMean)} weekly avg
+        let tierHtml = `
+          <div style="margin-bottom: 16px;">
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+              <span style="background: ${tierBadgeColor}; color: #fff; font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.5px;">${tierLabel}</span>
+              <span style="font-size: 12px; color: var(--muted);">${tierDescription}</span>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+        `;
+
+        patterns.forEach(pattern => {
+          const direction = pattern.diff > 0 ? 'above' : 'below';
+          const arrow = pattern.diff > 0 ? '↑' : '↓';
+          const color = pattern.diff > 0 ? 'var(--good)' : 'var(--warn)';
+
+          tierHtml += `
+            <div style="background: #0f1521; border-left: 3px solid ${tierColor}; border-top: 1px solid #223046; border-right: 1px solid #223046; border-bottom: 1px solid #223046; border-radius: 8px; padding: 10px; display: flex; justify-content: space-between; align-items: center;">
+              <div>
+                <strong style="font-size: 13px;">${pattern.day}s: ${pattern.label}</strong>
+                <div style="font-size: 12px; color: var(--muted); margin-top: 2px;">
+                  ${pattern.formatFn(pattern.dayMean)} vs ${pattern.formatFn(pattern.overallMean)} weekly avg
+                </div>
+              </div>
+              <div style="text-align: right;">
+                <div style="color: ${color}; font-weight: 600; font-size: 14px;">
+                  ${arrow} ${pattern.formatFn(Math.abs(pattern.diff))}
+                </div>
+                <div style="font-size: 11px; color: var(--muted);">
+                  ${Math.abs(pattern.percentDiff).toFixed(0)}% ${direction}
+                </div>
               </div>
             </div>
-            <div style="text-align: right;">
-              <div style="color: ${color}; font-weight: 600; font-size: 14px;">
-                ${arrow} ${pattern.formatFn(Math.abs(pattern.diff))}
-              </div>
-              <div style="font-size: 11px; color: var(--muted);">
-                ${Math.abs(pattern.percentDiff).toFixed(0)}% ${direction}
-              </div>
+          `;
+        });
+
+        tierHtml += `
             </div>
           </div>
         `;
-      });
+
+        return tierHtml;
+      };
+
+      // Render tiers in order: strong → moderate → subtle
+      html += renderTier(strongPatterns, 'Strong', '#3aa0ff', '#2b66b6', 'Large difference (>10%), highly significant (p≤0.01)');
+      html += renderTier(moderatePatterns, 'Moderate', '#61ce79', '#3d8a4f', 'Moderate difference (>5%) or small but highly significant');
+      html += renderTier(subtlePatterns, 'Subtle', '#8b94a8', '#4a5568', 'Statistically significant (p≤0.05) but small difference');
 
       html += `
-          </div>
         </div>
       `;
     }
